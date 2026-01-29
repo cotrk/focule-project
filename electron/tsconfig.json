@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.node.json",
+  "compilerOptions": {
+    "outDir": "../dist-electron",
+    "rootDir": ".",
+    "composite": false,
+    "forceConsistentCasingInFileNames": true,
+    "module": "CommonJS",
+    "moduleResolution": "node"
+  },
+  "include": ["**/*.ts"]
+}
+

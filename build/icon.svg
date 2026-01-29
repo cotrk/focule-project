@@ -1,0 +1,22 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="foculeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#C4B5FD"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="#0a0a0a"/>
+  
+  <!-- Inner glow ring -->
+  <rect x="24" y="24" width="208" height="208" rx="40" fill="none" stroke="url(#foculeGradient)" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Stylized "F" mark -->
+  <path d="M80 64 L80 192 L104 192 L104 140 L152 140 L152 116 L104 116 L104 88 L168 88 L168 64 L80 64 Z" fill="url(#foculeGradient)"/>
+  
+  <!-- Accent dot -->
+  <circle cx="176" cy="152" r="24" fill="url(#foculeGradient)"/>
+</svg>
+

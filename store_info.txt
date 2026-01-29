@@ -1,0 +1,16 @@
+https://focule.lemonsqueezy.com/checkout
+https://app.lemonsqueezy.com/share/738974
+https://app.lemonsqueezy.com/share/738974
+
+embed:
+<a href="https://focule.lemonsqueezy.com/checkout/buy/c91e2d74-d3a9-4c2b-b835-bb0ea890f663?embed=1" class="lemonsqueezy-button">Buy Focule</a><script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
+
+copy id
+	738974
+copy variant id:
+	1163204
+
+--
+
+Buttons on https://focule.com are using the url
+https://focule.lemonsqueezy.com/buy/1162309?embed=1

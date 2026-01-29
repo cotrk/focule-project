@@ -1,0 +1,371 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Focule Brand Colors - From Brand Kit */
+  --focule-cyan: #00F0FF;           /* Electric Cyan - Primary Action */
+  --focule-purple: #BD00FF;         /* Void Purple - Accents/Gradients */
+  --focule-primary: #00F0FF;        /* Primary for buttons/highlights */
+  --focule-primary-light: #33F3FF;  /* Lighter cyan for hover states */
+  --focule-accent: #BD00FF;         /* Purple accent */
+  
+  /* Brand Gradient - Alchemy Gradient */
+  --focule-gradient: linear-gradient(135deg, #00F0FF 0%, #BD00FF 100%);
+  --focule-gradient-hover: linear-gradient(135deg, #33F3FF 0%, #D44DFF 100%);
+  
+  /* Dark Theme - Ore Black System */
+  --focule-bg-primary: #0B0B0D;     /* Deepest background */
+  --focule-bg-secondary: #121214;   /* Slightly lighter */
+  --focule-bg-tertiary: #161618;    /* Surface */
+  --focule-card-bg: #161618;        /* Card background */
+  --focule-surface: #1F1F23;        /* Elevated surface */
+  --focule-border: #27272a;
+  --focule-border-subtle: rgba(255, 255, 255, 0.05);
+  
+  /* Typography Colors */
+  --focule-heading: #FFFFFF;
+  --focule-text-primary: #E5E5E5;
+  --focule-text-secondary: #A1A1AA;
+  --focule-text-muted: #71717A;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+body {
+  margin: 0;
+  /* Body text: Lato */
+  font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  background-color: var(--focule-bg-primary);
+  color: var(--focule-text-primary);
+}
+
+/* Headings - Montserrat */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--focule-heading);
+}
+
+h1 { 
+  font-size: 2.5rem; 
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+h2 { font-size: 1.75rem; letter-spacing: -0.03em; }
+h3 { font-size: 1.25rem; letter-spacing: -0.025em; }
+h4 { font-size: 1.125rem; font-weight: 600; }
+
+/* Paragraph and body text - Lato */
+p {
+  font-family: 'Lato', sans-serif;
+  line-height: 1.65;
+  letter-spacing: -0.011em;
+}
+
+/* UI Text - Nunito Sans */
+button, input, select, textarea, label {
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+/* Small text */
+small, .text-sm {
+  font-family: 'Nunito Sans', sans-serif;
+  letter-spacing: -0.006em;
+}
+
+.text-xs {
+  font-family: 'Nunito Sans', sans-serif;
+  letter-spacing: 0;
+}
+
+/* Font utility classes */
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.font-lato {
+  font-family: 'Lato', sans-serif;
+}
+
+.font-nunito {
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+/* Backgrounds */
+.focule-bg {
+  background-color: var(--focule-bg-primary);
+  min-height: 100vh;
+}
+
+/* Glassmorphism Cards */
+.focule-card {
+  background: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.focule-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Glass Panel variant */
+.focule-glass {
+  background: rgba(31, 31, 35, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Inputs - Nunito Sans */
+.focule-input {
+  font-family: 'Nunito Sans', sans-serif;
+  background-color: var(--focule-surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--focule-text-primary);
+  transition: all 0.15s ease;
+}
+
+.focule-input::placeholder {
+  color: var(--focule-text-muted);
+}
+
+.focule-input:focus {
+  outline: none;
+  border-color: var(--focule-cyan);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
+}
+
+/* Primary Button - Gradient (Cyan to Purple) */
+.focule-btn {
+  font-family: 'Nunito Sans', sans-serif;
+  background: var(--focule-gradient);
+  color: white;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 240, 255, 0.15),
+    0 0 0 1px rgba(0, 240, 255, 0.1);
+}
+
+.focule-btn:hover {
+  background: var(--focule-gradient-hover);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.15),
+    0 8px 24px rgba(189, 0, 255, 0.25),
+    0 0 20px rgba(189, 0, 255, 0.2);
+}
+
+.focule-btn:active {
+  transform: translateY(0);
+}
+
+/* Secondary Button - Outline Cyan */
+.focule-btn-secondary {
+  font-family: 'Nunito Sans', sans-serif;
+  background-color: transparent;
+  border: 1px solid var(--focule-cyan);
+  color: var(--focule-cyan);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: all 0.15s ease;
+}
+
+.focule-btn-secondary:hover {
+  background-color: rgba(0, 240, 255, 0.1);
+  border-color: var(--focule-cyan);
+  color: var(--focule-primary-light);
+}
+
+/* Ghost Button */
+.focule-btn-ghost {
+  font-family: 'Nunito Sans', sans-serif;
+  background-color: transparent;
+  color: var(--focule-text-secondary);
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.focule-btn-ghost:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--focule-text-primary);
+}
+
+/* Links */
+.focule-link {
+  color: var(--focule-cyan);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.focule-link:hover {
+  color: var(--focule-primary-light);
+}
+
+/* Logo - Gradient Text */
+.focule-logo {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  background: var(--focule-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Brand Text - Special F styling like brand kit */
+.focule-brand-text {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.focule-brand-f {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 900;
+  background: var(--focule-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.05em;
+}
+
+.focule-brand-ocule {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  color: white;
+}
+
+.focule-text-gradient {
+  background: var(--focule-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Accent colors */
+.text-focule-cyan {
+  color: var(--focule-cyan);
+}
+
+.text-focule-purple {
+  color: var(--focule-purple);
+}
+
+.bg-focule-cyan {
+  background-color: var(--focule-cyan);
+}
+
+.bg-focule-purple {
+  background-color: var(--focule-purple);
+}
+
+/* Border accent */
+.border-focule-cyan {
+  border-color: var(--focule-cyan);
+}
+
+.border-focule-purple {
+  border-color: var(--focule-purple);
+}
+
+/* Icons - Flat, minimal, with opacity */
+.focule-icon {
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+.focule-icon:hover {
+  opacity: 0.8;
+}
+
+.focule-icon-muted {
+  opacity: 0.35;
+}
+
+/* Code blocks */
+.focule-code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+/* Selection - Cyan accent */
+::selection {
+  background-color: rgba(0, 240, 255, 0.3);
+  color: white;
+}
+
+/* Scrollbar - Minimal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--focule-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Focus ring - Cyan */
+*:focus-visible {
+  outline: 2px solid var(--focule-cyan);
+  outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.1); }
+  50% { box-shadow: 0 0 40px rgba(189, 0, 255, 0.2); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s infinite;
+}
+
+/* Smooth transitions utility */
+.transition-all-300 {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
