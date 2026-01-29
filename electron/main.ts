@@ -48,9 +48,9 @@ ipcMain.handle('download:start', async (_event, url: string) => {
   }
 });
 
-ipcMain.handle('extract:audio', async (_event, videoPath: string) => {
+ipcMain.handle('extract:audio', async (_event, videoPath: string, sessionId: string) => {
   try {
-    const result = await extractAudio(videoPath);
+    const result = await extractAudio(videoPath, sessionId);
     return { success: true, ...result };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -297,7 +297,11 @@ ipcMain.handle('file:export-with-dialog', async (_event, projectData: {
     fs.writeFileSync(path.join(projectFolder, 'transcript_timestamped.txt'), projectData.transcriptWithTimestamps, 'utf-8');
     
     if (projectData.socialContent) {
-      const socialText = `HOOK/TITLE:\n${projectData.socialContent.hook || ''}\n\nDESCRIPTION:\n${projectData.socialContent.description || ''}\n\nHASHTAGS:\n${(projectData.socialContent.hashtags || []).join(' ')}\n\nKEYWORDS:\n${(projectData.socialContent.keywords || []).join(', ')}\n\nFILENAME SUGGESTIONS:\n${(projectData.socialContent.filenames || []).join('\n')}\n\nTEXT TO IMAGE PROMPTS:\n${(projectData.socialContent.imagePrompts || []).join('\n\n')}`;
+      const hooksText = projectData.socialContent.hooks && projectData.socialContent.hooks.length > 0 
+        ? projectData.socialContent.hooks.map((hook: string, index: number) => `${index + 1}. ${hook}`).join('\n')
+        : 'No hooks available';
+      
+      const socialText = `HOOK/TITLE OPTIONS:\n${hooksText}\n\nDESCRIPTION:\n${projectData.socialContent.description || ''}\n\nHASHTAGS:\n${(projectData.socialContent.hashtags || []).join(' ')}\n\nKEYWORDS:\n${(projectData.socialContent.keywords || []).join(', ')}\n\nFILENAME SUGGESTIONS:\n${(projectData.socialContent.filenames || []).join('\n')}\n\nTEXT TO IMAGE PROMPTS:\n${(projectData.socialContent.imagePrompts || []).join('\n\n')}`;
       fs.writeFileSync(path.join(projectFolder, 'results.txt'), socialText, 'utf-8');
     }
     

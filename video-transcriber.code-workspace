@@ -1,0 +1,14 @@
+{
+  "folders": [
+	{
+		"path": "."
+	},
+	{
+		"path": "../Focule_Dev"
+	},
+	{
+		"path": "../Focule_Public"
+	}
+],
+  "settings": {}
+}

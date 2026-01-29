@@ -5,6 +5,7 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   base: './',
+  publicDir: false, // Prevents serving marketing site during development
   build: {
     outDir: 'dist',
   },

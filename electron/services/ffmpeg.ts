@@ -7,10 +7,46 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { findFFmpeg } from '../utils/paths';
+import { touchSession } from './sessionCleanup';
 
 export interface AudioExtractionResult {
   audioPath: string;
   duration: number;
+  sessionId: string;
+}
+
+// ============================================================================
+// Session Management
+// ============================================================================
+
+interface SessionData {
+  sessionId: string;
+  videoPath: string;
+  createdAt: number;
+  audioPath?: string;
+  duration?: number;
+}
+
+function loadSessionData(sessionDir: string): SessionData | null {
+  const sessionFile = path.join(sessionDir, 'session.json');
+  if (!fs.existsSync(sessionFile)) {
+    return null;
+  }
+  
+  try {
+    return JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveSessionData(sessionDir: string, data: SessionData): void {
+  const sessionFile = path.join(sessionDir, 'session.json');
+  fs.writeFileSync(sessionFile, JSON.stringify(data, null, 2));
+}
+
+function getSessionDirectory(sessionId: string): string {
+  return path.join(app.getPath('userData'), 'sessions', sessionId);
 }
 
 /**
@@ -27,23 +63,41 @@ function sanitizeFilename(filename: string): string {
 
 /**
  * Extract audio from video file as WAV (optimized for Whisper)
+ * Uses session-based isolation to prevent cross-contamination
  */
-export async function extractAudio(videoPath: string): Promise<AudioExtractionResult> {
+export async function extractAudio(videoPath: string, sessionId: string): Promise<AudioExtractionResult> {
   if (!fs.existsSync(videoPath)) {
     throw new Error('Video file not found. The download may have failed.');
   }
 
-  // Setup output directory
-  const outputDir = path.join(app.getPath('userData'), 'audio');
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+  // Get session directory and validate
+  const sessionDir = getSessionDirectory(sessionId);
+  const sessionData = loadSessionData(sessionDir);
+  
+  if (!sessionData) {
+    throw new Error('Invalid session ID. Audio extraction must be part of a valid download session.');
+  }
+
+  // Update session access time
+  touchSession(sessionId);
+
+  // Validate that the video path belongs to this session
+  if (!videoPath.includes(sessionDir)) {
+    throw new Error('Video file does not belong to this session. Potential contamination detected.');
+  }
+
+  // Setup isolated audio directory for this session
+  const audioDir = path.join(sessionDir, 'audio');
+  if (!fs.existsSync(audioDir)) {
+    fs.mkdirSync(audioDir, { recursive: true });
   }
 
   const videoName = path.basename(videoPath, path.extname(videoPath));
   const sanitizedName = sanitizeFilename(videoName);
-  const audioPath = path.join(outputDir, `${sanitizedName}.wav`);
+  const audioPath = path.join(audioDir, `${sanitizedName}.wav`);
 
   const ffmpegPath = findFFmpeg();
+  console.log(`[FFmpeg] Session: ${sessionId}`);
   console.log(`[FFmpeg] Using: ${ffmpegPath}`);
   console.log(`[FFmpeg] Input: ${videoPath}`);
   console.log(`[FFmpeg] Output: ${audioPath}`);
@@ -93,11 +147,16 @@ export async function extractAudio(videoPath: string): Promise<AudioExtractionRe
         return;
       }
 
+      // Update session data with audio extraction results
+      sessionData.audioPath = audioPath;
+      sessionData.duration = duration;
+      saveSessionData(sessionDir, sessionData);
+
       console.log(`[FFmpeg] Success: ${audioPath} (${duration}s)`);
-      resolve({ audioPath, duration });
+      resolve({ audioPath, duration, sessionId });
     });
 
-    ffmpeg.on('error', (error) => {
+    ffmpeg.on('error', (_error) => {
       reject(new Error('Video processor not found. Please check System settings.'));
     });
   });

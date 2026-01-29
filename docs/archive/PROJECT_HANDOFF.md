@@ -11,7 +11,7 @@
 
 **Focule** is an Electron desktop application that downloads videos from YouTube and Twitch, extracts audio, transcribes using Whisper, and generates social media marketing content via Ollama LLMs.
 
-**Tagline:** *Transform video into insight*
+**Tagline:** _Transform video into insight_
 
 ### Core Workflow
 
@@ -27,19 +27,19 @@
 
 ### Colors (from Brand Kit)
 
-| Name | Hex | Usage |
-|------|-----|-------|
+| Name          | Hex       | Usage                       |
+| ------------- | --------- | --------------------------- |
 | Electric Cyan | `#00F0FF` | Primary actions, highlights |
-| Void Purple | `#BD00FF` | Accents, gradients |
-| Ore Black | `#0B0B0D` | Background |
-| Surface | `#161618` | Cards, elevated surfaces |
+| Void Purple   | `#BD00FF` | Accents, gradients          |
+| Ore Black     | `#0B0B0D` | Background                  |
+| Surface       | `#161618` | Cards, elevated surfaces    |
 
 ### Typography
 
-| Role | Font | Weight |
-|------|------|--------|
-| Headings | Montserrat | Bold / ExtraBold |
-| Body Text | Lato | Light / Regular / Bold |
+| Role         | Font        | Weight                     |
+| ------------ | ----------- | -------------------------- |
+| Headings     | Montserrat  | Bold / ExtraBold           |
+| Body Text    | Lato        | Light / Regular / Bold     |
 | UI / Buttons | Nunito Sans | Light / Regular / SemiBold |
 
 ### Brand Gradient
@@ -57,21 +57,28 @@ linear-gradient(135deg, #00F0FF 0%, #BD00FF 100%)
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | React 18 + TypeScript + Tailwind CSS |
-| **Backend** | Electron 28 + Node.js |
-| **Video Download** | yt-dlp (external binary) |
-| **Audio Processing** | FFmpeg (external binary) |
-| **Transcription** | Whisper.cpp (local models) |
-| **AI Content** | Ollama (local LLM server) |
-| **Build** | Vite + electron-builder |
+| Layer                | Technology                           |
+| -------------------- | ------------------------------------ |
+| **Frontend**         | React 18 + TypeScript + Tailwind CSS |
+| **Backend**          | Electron 28 + Node.js                |
+| **Video Download**   | yt-dlp (external binary)             |
+| **Audio Processing** | FFmpeg (external binary)             |
+| **Transcription**    | Whisper.cpp (local models)           |
+| **AI Content**       | Ollama (local LLM server)            |
+| **Build**            | Vite + electron-builder              |
 
 ---
 
 ## Project Structure
 
-```
+focule/
+├── electron/ # Main process (backend)
+│ ├── main.ts # Electron main entry, IPC handlers
+│ ├── preload.ts # Context bridge for renderer
+│ ├── services/
+│ │ ├── downloader.ts # yt-dlp video downloading
+
+```text
 focule/
 ├── electron/                    # Main process (backend)
 │   ├── main.ts                  # Electron main entry, IPC handlers
@@ -224,23 +231,23 @@ focule/
 
 ### Models Tested
 
-| Model | Game Recognition | Content Quality | Notes |
-|-------|------------------|-----------------|-------|
-| gemini-3-flash-preview:cloud | ✅ Excellent | ✅ Excellent | Correctly identified Warhammer Online |
-| gpt-oss:20b-cloud | ⚠️ Partial | ✅ Good | Got player names right, wrong game |
-| mistral-nemo:12b | ❌ Poor | ⚠️ Fair | Hallucinated game and duration |
-| qwen2.5-coder:7b | ❌ Generic | ⚠️ Fair | Coding model, not ideal for content |
+| Model                        | Game Recognition | Content Quality | Notes                                 |
+| ---------------------------- | ---------------- | --------------- | ------------------------------------- |
+| gemini-3-flash-preview:cloud | ✅ Excellent     | ✅ Excellent    | Correctly identified Warhammer Online |
+| gpt-oss:20b-cloud            | ⚠️ Partial       | ✅ Good         | Got player names right, wrong game    |
+| mistral-nemo:12b             | ❌ Poor          | ⚠️ Fair         | Hallucinated game and duration        |
+| qwen2.5-coder:7b             | ❌ Generic       | ⚠️ Fair         | Coding model, not ideal for content   |
 
 **Recommendation:** Use `gemini-3-flash-preview:cloud` for best results.
 
 ### Recommended Models by Hardware
 
-| VRAM | Recommended Models | Command |
-|------|-------------------|---------|
-| **8GB** (RTX 2080, 3070) | llama3.1:8b, llama3.2:3b, mistral:7b | `ollama pull llama3.1:8b` |
-| **12-16GB** (RTX 3080, 4070) | gemma2:9b, qwen2.5:14b | `ollama pull gemma2:9b` |
-| **24GB+** (RTX 4090) | gemma2:27b, qwen2.5:32b | `ollama pull gemma2:27b` |
-| **Cloud** | gemini-3-flash-preview:cloud | Best quality, no local compute |
+| VRAM                         | Recommended Models                   | Command                        |
+| ---------------------------- | ------------------------------------ | ------------------------------ |
+| **8GB** (RTX 2080, 3070)     | llama3.1:8b, llama3.2:3b, mistral:7b | `ollama pull llama3.1:8b`      |
+| **12-16GB** (RTX 3080, 4070) | gemma2:9b, qwen2.5:14b               | `ollama pull gemma2:9b`        |
+| **24GB+** (RTX 4090)         | gemma2:27b, qwen2.5:32b              | `ollama pull gemma2:27b`       |
+| **Cloud**                    | gemini-3-flash-preview:cloud         | Best quality, no local compute |
 
 **Avoid for content generation:** `*-coder` variants (optimized for code, not creative content)
 
@@ -340,19 +347,19 @@ npm run build
 
 ### IPC Channels (Main → Renderer)
 
-| Channel | Description |
-|---------|-------------|
-| `transcription:progress` | Processing status updates |
+| Channel                  | Description                                    |
+| ------------------------ | ---------------------------------------------- |
+| `transcription:progress` | Processing status updates                      |
 | `transcription:complete` | Final results with transcript + social content |
-| `transcription:error` | Error messages |
+| `transcription:error`    | Error messages                                 |
 
 ### IPC Channels (Renderer → Main)
 
-| Channel | Description |
-|---------|-------------|
-| `start-transcription` | Begin processing a URL |
-| `get-settings` | Retrieve current settings |
-| `save-settings` | Persist settings to disk |
+| Channel               | Description                             |
+| --------------------- | --------------------------------------- |
+| `start-transcription` | Begin processing a URL                  |
+| `get-settings`        | Retrieve current settings               |
+| `save-settings`       | Persist settings to disk                |
 | `check-prerequisites` | Check FFmpeg/yt-dlp/Ollama availability |
 
 ---
@@ -374,21 +381,21 @@ The app uses a custom CSS variable system for theming (see `--focule-*` variable
 
 ```css
 /* Brand Colors */
---focule-cyan: #00F0FF;
---focule-purple: #BD00FF;
---focule-gradient: linear-gradient(135deg, #00F0FF 0%, #BD00FF 100%);
+--focule-cyan: #00f0ff;
+--focule-purple: #bd00ff;
+--focule-gradient: linear-gradient(135deg, #00f0ff 0%, #bd00ff 100%);
 
 /* Backgrounds */
---focule-bg-primary: #0B0B0D;
+--focule-bg-primary: #0b0b0d;
 --focule-bg-secondary: #121214;
 --focule-bg-tertiary: #161618;
---focule-surface: #1F1F23;
+--focule-surface: #1f1f23;
 
 /* Typography */
---focule-heading: #FFFFFF;
---focule-text-primary: #E5E5E5;
---focule-text-secondary: #A1A1AA;
---focule-text-muted: #71717A;
+--focule-heading: #ffffff;
+--focule-text-primary: #e5e5e5;
+--focule-text-secondary: #a1a1aa;
+--focule-text-muted: #71717a;
 ```
 
 ### Component Classes
@@ -427,12 +434,12 @@ The app uses a custom CSS variable system for theming (see `--focule-*` variable
 
 ### White-Label Changes
 
-| Before | After |
-|--------|-------|
-| "AI Model (Ollama)" | "AI Content Engine" |
-| "Whisper Model" | "Voice Recognition Quality" |
+| Before                                 | After                          |
+| -------------------------------------- | ------------------------------ |
+| "AI Model (Ollama)"                    | "AI Content Engine"            |
+| "Whisper Model"                        | "Voice Recognition Quality"    |
 | "Lightweight / Balanced / Performance" | "Fast / Recommended / Premium" |
-| Technical error messages | User-friendly messages |
+| Technical error messages               | User-friendly messages         |
 
 ### Code Changes
 
@@ -450,7 +457,11 @@ The app uses a custom CSS variable system for theming (see `--focule-*` variable
 
 ### Repository Structure
 
-```
+D:\Workshop\Dev\Projects\
+├── video-transcriber/ ← Dev/Pre-production (working folder)
+└── Focule_Repo/ ← Production/GitHub (clean releases)
+
+```text
 D:\Workshop\Dev\Projects\
 ├── video-transcriber/     ← Dev/Pre-production (working folder)
 └── Focule_Repo/           ← Production/GitHub (clean releases)
@@ -493,4 +504,4 @@ D:\Workshop\Dev\Projects\
 
 ---
 
-*Generated: December 20, 2024*
+# Generated: December 20, 2024

@@ -1,8 +1,12 @@
+import { useState, useEffect } from 'react';
+import { tipsManager, Tip, STAGE_SPECIFIC_TIPS } from '../utils/dynamicTips';
+
 interface ProgressBarProps {
   label: string;
   percent: number;
   status?: string;
   details?: string;
+  showTips?: boolean;
 }
 
 const statusIcons: Record<string, JSX.Element> = {
@@ -28,9 +32,55 @@ const statusIcons: Record<string, JSX.Element> = {
   ),
 };
 
-export function ProgressBar({ label, percent, status, details }: ProgressBarProps) {
+export function ProgressBar({ label, percent, status, details, showTips = true }: ProgressBarProps): JSX.Element {
+  const [currentTip, setCurrentTip] = useState<Tip | null>(null);
+  const [tipVisible, setTipVisible] = useState(false);
+
   const labelKey = label.toLowerCase().replace(' ', '') as keyof typeof statusIcons;
   const icon = statusIcons[labelKey] || statusIcons.processing;
+
+  // Update tips based on processing stage
+  useEffect(() => {
+    if (!showTips) {
+      tipsManager.stopRotation();
+      setTipVisible(false);
+      return;
+    }
+
+    // Map label to stage
+    const stage: keyof typeof STAGE_SPECIFIC_TIPS = 
+      labelKey === 'downloading' ? 'downloading' :
+      labelKey === 'extracting' ? 'extracting' :
+      labelKey === 'transcribing' ? 'transcribing' :
+      labelKey === 'processing' ? 'processing' : 'downloading';
+    
+    tipsManager.setStage(stage);
+
+    // Start tip rotation
+    tipsManager.startRotation((tip) => {
+      setCurrentTip(tip);
+      setTipVisible(true);
+    }, 8000); // Rotate every 8 seconds
+
+    return () => {
+      tipsManager.stopRotation();
+    };
+  }, [labelKey, showTips]);
+
+  // Get tip styling based on type
+  const getTipStyle = (type: Tip['type']) => {
+    const baseStyle = "text-xs p-3 rounded-lg border transition-all duration-500 ";
+    switch (type) {
+      case 'fact':
+        return baseStyle + "bg-blue-500/10 border-blue-500/20 text-blue-400";
+      case 'tip':
+        return baseStyle + "bg-green-500/10 border-green-500/20 text-green-400";
+      case 'model-info':
+        return baseStyle + "bg-purple-500/10 border-purple-500/20 text-purple-400";
+      default:
+        return baseStyle + "bg-[var(--focule-bg-secondary)] border-[var(--focule-border-subtle)] text-[var(--focule-text-muted)]";
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -53,12 +103,55 @@ export function ProgressBar({ label, percent, status, details }: ProgressBarProp
           </div>
         </div>
       </div>
+      
       {status && (
         <p className="text-sm text-[var(--focule-text-secondary)] pl-7">{status}</p>
       )}
+      
       {details && (
         <p className="text-xs text-[var(--focule-text-muted)] pl-7">{details}</p>
       )}
+
+      {/* Dynamic Tips Section */}
+      {showTips && tipVisible && currentTip && (
+        <div className="pl-7">
+          <div 
+            className={getTipStyle(currentTip.type)}
+            style={{
+              animation: 'slideIn 0.5s ease-out'
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <span className="flex-shrink-0 mt-0.5">
+                {currentTip.type === 'fact' && '💡'}
+                {currentTip.type === 'tip' && '⚡'}
+                {currentTip.type === 'model-info' && '🤖'}
+                {currentTip.type === 'info' && '📚'}
+              </span>
+              <span className="leading-relaxed">{currentTip.text}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// Add CSS animation for slide-in effect
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`;
+if (!document.head.querySelector('style[data-dynamic-tips]')) {
+  style.setAttribute('data-dynamic-tips', 'true');
+  document.head.appendChild(style);
 }

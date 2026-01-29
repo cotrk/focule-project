@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Audio extraction
-  extractAudio: (videoPath: string) => ipcRenderer.invoke('extract:audio', videoPath),
+  extractAudio: (videoPath: string, sessionId: string) => ipcRenderer.invoke('extract:audio', videoPath, sessionId),
   
   // Transcription service
   transcribeAudio: (audioPath: string, model?: string) => 

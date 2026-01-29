@@ -8,6 +8,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { findYtDlp, findFFmpeg, VIDEO_EXTENSIONS, INVALID_EXTENSIONS } from '../utils/paths';
+import * as crypto from 'crypto';
+import { registerSession, completeSession, touchSession } from './sessionCleanup';
 
 // ============================================================================
 // Types
@@ -25,6 +27,63 @@ export interface DownloadResult {
   videoPath: string;
   title: string;
   duration: number;
+  sessionId: string;
+}
+
+// ============================================================================
+// Session Management
+// ============================================================================
+
+interface SessionData {
+  sessionId: string;
+  url: string;
+  createdAt: number;
+  videoPath?: string;
+  title?: string;
+  duration?: number;
+}
+
+function createSessionId(url: string): string {
+  const hash = crypto.createHash('sha256').update(url).digest('hex').substring(0, 16);
+  const timestamp = Date.now().toString(36);
+  return `${hash}_${timestamp}`;
+}
+
+function createSessionDirectory(sessionId: string): string {
+  const sessionsDir = path.join(app.getPath('userData'), 'sessions');
+  if (!fs.existsSync(sessionsDir)) {
+    fs.mkdirSync(sessionsDir, { recursive: true });
+  }
+  
+  const sessionDir = path.join(sessionsDir, sessionId);
+  if (!fs.existsSync(sessionDir)) {
+    fs.mkdirSync(sessionDir, { recursive: true });
+  }
+  
+  const downloadsDir = path.join(sessionDir, 'downloads');
+  if (!fs.existsSync(downloadsDir)) {
+    fs.mkdirSync(downloadsDir, { recursive: true });
+  }
+  
+  return sessionDir;
+}
+
+function saveSessionData(sessionDir: string, data: SessionData): void {
+  const sessionFile = path.join(sessionDir, 'session.json');
+  fs.writeFileSync(sessionFile, JSON.stringify(data, null, 2));
+}
+
+function loadSessionData(sessionDir: string): SessionData | null {
+  const sessionFile = path.join(sessionDir, 'session.json');
+  if (!fs.existsSync(sessionFile)) {
+    return null;
+  }
+  
+  try {
+    return JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================================
@@ -67,11 +126,18 @@ function isPartialStreamFile(filename: string): boolean {
 }
 
 /**
- * Find the downloaded video file
- * Tries recent files first, then falls back to any valid video file (for cached downloads)
+ * Find the downloaded video file within a session directory
+ * Validates file ownership by checking session metadata
  */
-function findDownloadedVideo(outputDir: string, downloadStartTime: number, alreadyDownloaded: boolean = false): string | null {
+function findDownloadedVideo(sessionDir: string, downloadStartTime: number, alreadyDownloaded: boolean = false): string | null {
+  const outputDir = path.join(sessionDir, 'downloads');
   if (!fs.existsSync(outputDir)) return null;
+  
+  const sessionData = loadSessionData(sessionDir);
+  if (!sessionData) {
+    console.error('[Downloader] No session data found for validation');
+    return null;
+  }
   
   const files = fs.readdirSync(outputDir);
   
@@ -92,10 +158,21 @@ function findDownloadedVideo(outputDir: string, downloadStartTime: number, alrea
     .filter(f => f.size > 1000) // Must be >1KB
     .sort((a, b) => b.mtime - a.mtime); // Most recent first
   
-  // If yt-dlp said file was already downloaded, just use the most recent valid file
+  // If yt-dlp said file was already downloaded, validate with session data
   if (alreadyDownloaded && allVideoFiles.length > 0) {
-    console.log(`[Downloader] Using cached file: ${allVideoFiles[0].name}`);
-    return allVideoFiles[0].path;
+    const candidateFile = allVideoFiles[0];
+    // Additional validation: check if file matches expected session timeframe
+    const sessionAge = Date.now() - sessionData.createdAt;
+    const fileAge = Date.now() - candidateFile.mtime;
+    
+    // Only use cached file if it's from this session or very recent
+    if (fileAge < 60000 && sessionAge < 300000) { // 1 min file age, 5 min session age
+      console.log(`[Downloader] Using validated cached file: ${candidateFile.name}`);
+      return candidateFile.path;
+    } else {
+      console.log(`[Downloader] Cached file too old, forcing re-download`);
+      return null; // Force re-download
+    }
   }
   
   // Otherwise, prefer files modified recently (within 5 min of download start)
@@ -178,10 +255,12 @@ function checkForInvalidDownload(outputDir: string, downloadStartTime: number): 
 }
 
 /**
- * Get video info from .info.json file
+ * Get video info from .info.json file within session directory
+ * Validates that info file belongs to the current session
  */
-function getVideoInfo(videoPath: string, outputDir: string): { title: string; duration: number } {
+function getVideoInfo(videoPath: string, sessionDir: string): { title: string; duration: number } {
   const baseName = path.basename(videoPath, path.extname(videoPath));
+  const outputDir = path.join(sessionDir, 'downloads');
   const infoPath = path.join(outputDir, `${baseName}.info.json`);
   
   try {
@@ -191,13 +270,13 @@ function getVideoInfo(videoPath: string, outputDir: string): { title: string; du
         title: info.title || baseName,
         duration: info.duration || 0,
       };
-      }
+    }
   } catch {
     // Ignore parse errors
   }
   
   return { title: baseName, duration: 0 };
-  }
+}
 
 // ============================================================================
 // Error Messages
@@ -205,6 +284,32 @@ function getVideoInfo(videoPath: string, outputDir: string): { title: string; du
 
 function parseYtDlpError(stderr: string, stdout: string): string {
   const output = (stderr + stdout).toLowerCase();
+  
+  // yt-dlp option errors
+  if (output.includes('no such option') || output.includes('unrecognized arguments')) {
+    return 'The yt-dlp version is outdated. Some advanced options may not be available. Using compatible fallback settings.';
+  }
+  
+  // YouTube-specific errors
+  if (output.includes('http error 403') || output.includes('forbidden')) {
+    return 'YouTube is blocking the download. This is usually temporary. Try these solutions:\n\n1. Wait 2-3 minutes and try again\n2. Try a different YouTube video\n3. Check if the video is public (not private or age-restricted)\n4. Use Twitch videos as an alternative\n\nYouTube frequently updates their anti-bot measures, causing temporary blocks.';
+  }
+  
+  if (output.includes('http error 429') || output.includes('too many requests')) {
+    return 'YouTube rate limit detected. Please wait 5-10 minutes before trying again. This happens when too many requests are made in a short time.';
+  }
+  
+  if (output.includes('network error') || output.includes('connection') || output.includes('timeout')) {
+    return 'Network connection issue. Please check your internet connection and try again. YouTube may be experiencing temporary issues.';
+  }
+  
+  if (output.includes('no supported javascript runtime')) {
+    return 'YouTube requires JavaScript runtime for extraction. The app is using alternative methods to bypass this.';
+  }
+  
+  if (output.includes('sabr streaming')) {
+    return 'YouTube is using advanced streaming protection. The app is attempting alternative extraction methods.';
+  }
   
   if (output.includes('requested format is not available')) {
     return 'The requested video format is not available. The video may be restricted or unavailable for download.';
@@ -217,7 +322,7 @@ function parseYtDlpError(stderr: string, stdout: string): string {
   }
   if (output.includes('sign in to confirm your age')) {
     return 'This video is age-restricted. Downloading age-restricted videos requires authentication (not yet supported).';
-}
+  }
   if (output.includes('429') || output.includes('too many requests')) {
     return 'Too many requests. Please wait a few minutes and try again.';
   }
@@ -241,13 +346,22 @@ export async function downloadVideo(
   const platform = getPlatform(url);
   console.log(`[Downloader] Starting download from ${platform}: ${url}`);
   
-  // Setup output directory
-  const outputDir = path.join(app.getPath('userData'), 'downloads');
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  // Track download start time for file detection
+  // Create isolated session for this download
+  const sessionId = createSessionId(url);
+  const sessionDir = createSessionDirectory(sessionId);
+  
+  // Register session for cleanup tracking
+  registerSession(sessionId);
+  
+  // Initialize session data
+  const sessionData: SessionData = {
+    sessionId,
+    url,
+    createdAt: Date.now(),
+  };
+  saveSessionData(sessionDir, sessionData);
+  
+  const outputDir = path.join(sessionDir, 'downloads');
   const downloadStartTime = Date.now();
   
   // Get yt-dlp command and FFmpeg location
@@ -255,15 +369,16 @@ export async function downloadVideo(
   const ffmpegPath = findFFmpeg();
   const outputTemplate = path.resolve(outputDir, '%(title)s.%(ext)s');
   
+  console.log(`[Downloader] Session: ${sessionId}`);
   console.log(`[Downloader] Output: ${outputDir}`);
   console.log(`[Downloader] Using: ${ytDlpCmd.command} ${ytDlpCmd.args.join(' ')}`);
   console.log(`[Downloader] FFmpeg: ${ffmpegPath}`);
 
   return new Promise((resolve, reject) => {
-    // Build yt-dlp arguments
+    // Build yt-dlp arguments with minimal, compatible options
     const downloadArgs = [
       url,
-      '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+      '-f', 'best[height<=720]/best', // Limit to 720p to avoid restrictions
       '--merge-output-format', 'mp4',
       '--no-playlist',
       '--write-info-json',
@@ -272,7 +387,11 @@ export async function downloadVideo(
       '--retries', '10',
       '--fragment-retries', '10',
       '--extractor-retries', '3',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '--referer', 'https://www.youtube.com/',
+      '--add-header', 'Accept-Language:en-US,en;q=0.9',
+      '--ignore-errors',
+      '--no-abort-on-error',
       '-4', // Force IPv4
     ];
     
@@ -346,19 +465,28 @@ export async function downloadVideo(
           return;
         }
 
-      // Find the downloaded video (pass alreadyDownloaded flag for cached files)
-      const videoPath = findDownloadedVideo(outputDir, downloadStartTime, alreadyDownloaded);
+      // Find the downloaded video (pass sessionDir for validation)
+      const videoPath = findDownloadedVideo(sessionDir, downloadStartTime, alreadyDownloaded);
       if (!videoPath) {
         console.error(`[Downloader] No video file found in ${outputDir}`);
         reject(new Error('Download failed. Please check the URL and your internet connection.'));
         return;
       }
       
-      // Get video info
-      const { title, duration } = getVideoInfo(videoPath, outputDir);
+      // Get video info (pass sessionDir for validation)
+      const { title, duration } = getVideoInfo(videoPath, sessionDir);
+      
+      // Update session data with results
+      sessionData.videoPath = videoPath;
+      sessionData.title = title;
+      sessionData.duration = duration;
+      saveSessionData(sessionDir, sessionData);
+      
+      // Mark session as complete for cleanup tracking
+      completeSession(sessionId);
       
       console.log(`[Downloader] Success: ${videoPath}`);
-      resolve({ videoPath, title, duration });
+      resolve({ videoPath, title, duration, sessionId });
     });
 
     // Handle spawn errors

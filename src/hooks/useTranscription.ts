@@ -72,8 +72,8 @@ export function useTranscription() {
         message: 'Extracting audio...',
       });
 
-      // Extract audio
-      const audioResult = await window.electronAPI.extractAudio(downloadResult.videoPath);
+      // Extract audio (pass sessionId for isolation)
+      const audioResult = await window.electronAPI.extractAudio(downloadResult.videoPath, downloadResult.sessionId);
       if (!audioResult.success) {
         throw new Error(audioResult.error || 'Audio extraction failed');
       }

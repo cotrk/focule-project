@@ -23,11 +23,11 @@
   --focule-border: #27272a;
   --focule-border-subtle: rgba(255, 255, 255, 0.05);
   
-  /* Typography Colors */
+  /* Typography Colors - Improved Contrast for WCAG AA Compliance */
   --focule-heading: #FFFFFF;
   --focule-text-primary: #E5E5E5;
-  --focule-text-secondary: #A1A1AA;
-  --focule-text-muted: #71717A;
+  --focule-text-secondary: #B8B8C0; /* Increased from #A1A1AA for better contrast */
+  --focule-text-muted: #8B8B94;     /* Increased from #71717A for better contrast */
 }
 
 * {
@@ -148,7 +148,7 @@ small, .text-sm {
   box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
 }
 
-/* Primary Button - Gradient (Cyan to Purple) */
+/* Enhanced button feedback */
 .focule-btn {
   font-family: 'Nunito Sans', sans-serif;
   background: var(--focule-gradient);
@@ -172,7 +172,8 @@ small, .text-sm {
 }
 
 .focule-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
+  transition: transform 0.1s ease;
 }
 
 /* Secondary Button - Outline Cyan */
@@ -331,41 +332,112 @@ small, .text-sm {
   background: #555;
 }
 
-/* Focus ring - Cyan */
+/* Enhanced focus ring - Better visibility */
 *:focus-visible {
-  outline: 2px solid var(--focule-cyan);
-  outline-offset: 2px;
+  outline: 3px solid var(--focule-cyan);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(0, 240, 255, 0.1);
 }
 
-/* Animations */
+/* Enhanced animations and micro-interactions */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 240, 255, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.4); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
 }
 
 .animate-pulse-soft {
   animation: pulse-soft 2s ease-in-out infinite;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.1); }
-  50% { box-shadow: 0 0 40px rgba(189, 0, 255, 0.2); }
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 3s infinite;
+/* Loading states */
+.loading-skeleton {
+  background: linear-gradient(90deg, 
+    var(--focule-bg-secondary) 25%, 
+    var(--focule-bg-tertiary) 50%, 
+    var(--focule-bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Mobile responsiveness improvements */
+@media (max-width: 640px) {
+  .focule-card {
+    margin: 8px;
+    padding: 16px;
+  }
+  
+  .focule-btn {
+    min-height: 44px; /* iOS touch target minimum */
+    padding: 12px 20px;
+  }
+  
+  /* Ensure no horizontal scroll */
+  body {
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  .focule-card {
+    margin: 4px;
+    padding: 12px;
+  }
+  
+  h1 { 
+    font-size: 2rem; 
+  }
+  
+  h2 { font-size: 1.5rem; }
 }
 
 /* Smooth transitions utility */
 .transition-all-300 {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced interactive states */
+.interactive-element {
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.interactive-element:hover {
+  transform: translateY(-1px);
+}
+
+.interactive-element:active {
+  transform: translateY(0) scale(0.98);
 }

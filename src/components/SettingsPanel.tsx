@@ -95,7 +95,19 @@ export function SettingsPanel() {
   const handleChange = (key: keyof Settings, value: string) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-    window.electronAPI?.setSettings(newSettings);
+    // Don't save immediately - wait for user to click Save
+  };
+
+  // Handler for saving settings
+  const handleSave = async () => {
+    try {
+      await window.electronAPI?.setSettings(settings);
+      alert('✅ Settings saved successfully!');
+      setIsOpen(false); // Close settings panel after successful save
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      alert('❌ Failed to save settings. Please try again.\n\nPossible causes:\n- File permission issues\n- Invalid export directory path\n- Network connection issues\n\nSolution: Check your export directory path and try again.');
+    }
   };
 
   const getTierForModel = (model: string): 'lightweight' | 'balanced' | 'performance' | null => {
@@ -103,6 +115,43 @@ export function SettingsPanel() {
     if (categorized.balanced.includes(model)) return 'balanced';
     if (categorized.performance.includes(model)) return 'performance';
     return null;
+  };
+
+  // Handler for browsing export directory
+  const handleBrowseExportDirectory = async () => {
+    if (!window.electronAPI?.prerequisites?.browsePath) {
+      alert('Directory browsing not available');
+      return;
+    }
+
+    try {
+      const path = await window.electronAPI.prerequisites.browsePath('export-directory');
+      if (path) {
+        handleChange('outputPath', path);
+      }
+    } catch (error) {
+      console.error('Failed to browse directory:', error);
+      alert('Failed to browse directory');
+    }
+  };
+
+  // Handler for opening backup directory
+  const handleOpenBackupDirectory = async () => {
+    const backupPath = settings.outputPath || 
+      (await window.electronAPI?.getSettings())?.outputPath || 
+      require('os').homedir() + '/Downloads/Focule-Backups';
+
+    if (!window.electronAPI?.openFolder) {
+      alert('Cannot open folder: ElectronAPI not available');
+      return;
+    }
+
+    try {
+      await window.electronAPI.openFolder(backupPath);
+    } catch (error) {
+      console.error('Failed to open backup directory:', error);
+      alert('Failed to open backup directory');
+    }
   };
 
   return (
@@ -147,16 +196,35 @@ export function SettingsPanel() {
                   <label className="block text-sm font-medium text-[var(--focule-text-primary)] mb-2">
                     Export Directory
                   </label>
-                  <input
-                    type="text"
-                    value={settings.outputPath}
-                    onChange={(e) => handleChange('outputPath', e.target.value)}
-                    placeholder="Default: Downloads folder"
-                    className="w-full px-4 py-3 focule-input rounded-lg text-sm"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.outputPath}
+                      onChange={(e) => handleChange('outputPath', e.target.value)}
+                      placeholder="Default: Downloads folder"
+                      className="flex-1 px-4 py-3 focule-input rounded-lg text-sm"
+                    />
+                    <button
+                      onClick={handleBrowseExportDirectory}
+                      className="px-4 py-3 bg-[var(--focule-bg-primary)] border border-[var(--focule-border)] rounded-lg hover:bg-[var(--focule-bg-secondary)] transition-colors"
+                      title="Browse for export directory"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </button>
+                  </div>
                   <p className="mt-2 text-xs text-[var(--focule-text-muted)]">
-                    Where exported files will be saved
+                    Default location for automatic result backups. Results are also saved here as a fail-safe.
                   </p>
+                  <div className="mt-2">
+                    <button
+                      onClick={handleOpenBackupDirectory}
+                      className="text-xs text-[var(--focule-primary)] hover:text-[var(--focule-primary-hover)] transition-colors"
+                    >
+                      📁 Open Result Backups Folder
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -342,10 +410,13 @@ export function SettingsPanel() {
                 Refresh Models
               </button>
               <button
-                onClick={() => setIsOpen(false)}
-                className="px-6 py-2.5 focule-btn rounded-lg text-sm"
+                onClick={handleSave}
+                className="px-6 py-2.5 focule-btn rounded-lg text-sm flex items-center gap-2"
               >
-                Done
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V2" />
+                </svg>
+                Save Settings
               </button>
             </div>
           </div>
