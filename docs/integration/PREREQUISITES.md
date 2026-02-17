@@ -206,8 +206,6 @@ ollama pull llama3.1:8b  # Automatically uses GPU if available
 ## 🔗 Related Documentation
 
 - [External Tools Guide](./EXTERNAL_TOOLS.md) - Detailed tool configuration
-- [Development Setup](../development/SETUP.md) - Developer environment
-- [Troubleshooting](../development/TROUBLESHOOTING.md) - Common issues
 
 ---
 

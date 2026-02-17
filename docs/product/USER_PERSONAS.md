@@ -7,6 +7,7 @@
 ## 🎯 Project Context
 
 **Focule** - A desktop application built with Electron + React + TypeScript that:
+
 - Downloads videos from YouTube/Twitch using yt-dlp
 - Transcribes audio using OpenAI Whisper (local)
 - Generates social media content using Ollama LLM
@@ -19,53 +20,65 @@
 ## 📋 Task Type Categorization
 
 ### 1. Building New Features
+
 **Description**: Creating new functionality from scratch
 
 **Primary Personas**:
+
 - `react-typescript-architect`
-- `electron-integration-specialist` 
+- `electron-integration-specialist`
 - `ui-ux-designer`
 
 **Collaboration Patterns**:
+
 - **Frontend-heavy**: architect + designer
 - **Desktop-app**: architect + integration specialist
 - **Full-stack**: all three with clear boundaries
 
 ### 2. Fixing Problems
+
 **Description**: Resolving issues and bugs in desktop application
 
 **Primary Personas**:
+
 - `bug-detective`
 - `performance-engineer`
 - `electron-debug-specialist`
 
 **Collaboration Patterns**:
+
 - **Systematic debugging**: bug-detective lead
 - **Performance issues**: performance-engineer lead
 - **Electron-specific**: integration specialist + bug-detective
 
 ### 3. Improving Code
+
 **Description**: Enhancing existing codebase quality
 
 **Primary Personas**:
+
 - `refactoring-specialist`
 - `testing-engineer`
 - `code-reviewer`
 
 **Collaboration Patterns**:
+
 - **Quality improvement**: reviewer + specialist
 - **Test coverage**: testing-engineer with domain expert
 - **Architecture cleanup**: refactoring-specialist lead
 
 ### 4. Domain Understanding
+
 **Description**: Context and knowledge development for video/AI domain
 
 **Primary Personas**:
+
 - `video-processing-expert`
 - `ai-integration-specialist`
 - `documentation-writer`
 
 **Collaboration Patterns**:
+
 - **Knowledge transfer**: domain expert + writer
 - **Technical documentation**: writer with specialist
 - **AI/ML integration**: AI specialist with architect
@@ -75,19 +88,23 @@
 ## 🏗️ Component Type Specialization
 
 ### Video Processing Components
+
 **Optimal Team**: [`electron-integration-specialist`, `video-processing-expert`]
-**Expertise Focus**: 
+**Expertise Focus**:
+
 - FFmpeg integration
 - yt-dlp wrapper implementation
 - Audio extraction workflows
-**Success Factors**: 
+**Success Factors**:
 - Robust error handling
 - Progress tracking
 - Cross-platform compatibility
 
 ### Transcription Interface
+
 **Optimal Team**: [`react-typescript-architect`, `ui-ux-designer`]
 **Expertise Focus**:
+
 - Real-time progress display
 - File upload/download UI
 - Settings management
@@ -97,8 +114,10 @@
 - Responsive design
 
 ### AI Content Generation
+
 **Optimal Team**: [`ai-integration-specialist`, `react-typescript-architect`]
 **Expertise Focus**:
+
 - Ollama API integration
 - Content display components
 - Model selection interface
@@ -108,8 +127,10 @@
 - Model compatibility
 
 ### Settings & Configuration
+
 **Optimal Team**: [`ui-ux-designer`, `electron-integration-specialist`]
 **Expertise Focus**:
+
 - Prerequisites checking
 - Path configuration
 - Model selection UI
@@ -119,8 +140,10 @@
 - User-friendly setup
 
 ### Export & Results Display
+
 **Optimal Team**: [`react-typescript-architect`, `performance-engineer`]
 **Expertise Focus**:
+
 - Large text display
 - Copy-to-clipboard functionality
 - File export workflows
@@ -134,9 +157,11 @@
 ## 👥 Persona Specifications
 
 ### react-typescript-architect
+
 **Role Definition**: Frontend component specialist with TypeScript expertise for desktop applications
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - React hooks and patterns mastery
   - Advanced TypeScript type system
@@ -151,6 +176,7 @@
   - Testing strategies
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - New React component creation
   - Complex state management implementation
@@ -164,14 +190,17 @@
   - Cross-platform packaging
 
 **Collaboration Style**:
+
 - **Works Best With**: ui-ux-designer, electron-integration-specialist, testing-engineer
 - **Leadership Situations**: Frontend architecture decisions, Component library standards
 - **Support Needs**: Design requirements, Electron APIs, User feedback
 
 ### electron-integration-specialist
+
 **Role Definition**: Electron desktop application expert with system integration focus
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - Electron main/renderer process architecture
   - IPC (Inter-Process Communication)
@@ -186,6 +215,7 @@
   - Error handling and logging
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - Electron main process development
   - IPC communication setup
@@ -199,14 +229,17 @@
   - Database operations
 
 **Collaboration Style**:
+
 - **Works Best With**: react-typescript-architect, video-processing-expert, bug-detective
 - **Leadership Situations**: Electron architecture decisions, System integration strategy
 - **Support Needs**: Frontend requirements, System specifications, Security requirements
 
 ### ui-ux-designer
+
 **Role Definition**: User interface and experience specialist for desktop applications
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - Modern CSS and Tailwind CSS
   - Desktop UI/UX patterns
@@ -221,6 +254,7 @@
   - Performance impact of design choices
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - UI component styling and theming
   - Desktop layout implementation
@@ -234,14 +268,17 @@
   - Audio/video processing
 
 **Collaboration Style**:
+
 - **Works Best With**: react-typescript-architect, accessibility-auditor, testing-engineer
 - **Leadership Situations**: Design system decisions, UX strategy, Accessibility standards
 - **Support Needs**: Component requirements, User research, Brand guidelines
 
 ### video-processing-expert
+
 **Role Definition**: Audio/video processing and external tools integration specialist
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - FFmpeg command-line interface
   - yt-dlp integration and configuration
@@ -256,6 +293,7 @@
   - Cross-platform tool compatibility
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - FFmpeg integration and optimization
   - yt-dlp wrapper development
@@ -269,14 +307,17 @@
   - Database operations
 
 **Collaboration Style**:
+
 - **Works Best With**: electron-integration-specialist, performance-engineer, bug-detective
 - **Leadership Situations**: Video processing architecture, Tool integration strategy
 - **Support Needs**: UI requirements, Performance constraints, Error handling specifications
 
 ### ai-integration-specialist
+
 **Role Definition**: AI/ML integration expert with focus on local model deployment
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - Ollama API integration
   - Whisper model configuration
@@ -291,6 +332,7 @@
   - Resource management for local models
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - Ollama integration and configuration
   - Whisper transcription setup
@@ -304,14 +346,17 @@
   - Database operations
 
 **Collaboration Style**:
+
 - **Works Best With**: react-typescript-architect, performance-engineer, documentation-writer
 - **Leadership Situations**: AI architecture decisions, Model selection strategy
 - **Support Needs**: Frontend requirements, Performance constraints, Content specifications
 
 ### performance-engineer
+
 **Role Definition**: Application performance optimization specialist for desktop applications
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - Performance profiling and analysis
   - Memory management and leak detection
@@ -326,6 +371,7 @@
   - User experience impact assessment
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - Performance bottleneck resolution
   - Memory leak investigation
@@ -339,14 +385,17 @@
   - System integration
 
 **Collaboration Style**:
+
 - **Works Best With**: react-typescript-architect, electron-integration-specialist, bug-detective
 - **Leadership Situations**: Performance strategy, Optimization priorities, Performance budgets
 - **Support Needs**: Performance requirements, User expectations, Technical constraints
 
 ### bug-detective
+
 **Role Definition**: Systematic debugging and problem resolution expert for desktop applications
 
 **Core Competencies**:
+
 - **Technical Skills**:
   - Advanced debugging techniques
   - Electron debugging tools
@@ -361,6 +410,7 @@
   - Documentation and knowledge transfer
 
 **Task Suitability**:
+
 - **Ideal Tasks**:
   - Complex bug investigation
   - Cross-platform compatibility issues
@@ -374,6 +424,7 @@
   - Visual design work
 
 **Collaboration Style**:
+
 - **Works Best With**: testing-engineer, code-reviewer, domain specialists
 - **Leadership Situations**: Bug triage process, Debugging standards, Knowledge sharing
 - **Support Needs**: Bug reports and reproduction steps, System context, Technical documentation
@@ -383,6 +434,7 @@
 ## 🎯 Task Analysis & Matching Algorithm
 
 ### Task Analysis Process
+
 1. **Parse task description** for technical keywords
 2. **Identify primary technology requirements** (React, Electron, AI, Video)
 3. **Assess complexity and scope factors** (single component vs system-wide)
@@ -390,12 +442,14 @@
 5. **Evaluate expertise requirements** (specialized vs general)
 
 ### Persona Selection Criteria
+
 - **Core competency alignment** (40% weight)
 - **Task type specialization** (25% weight)
 - **Collaboration compatibility** (20% weight)
 - **Availability and workload** (15% weight)
 
 ### Team Composition Rules
+
 - **Avoid single-person teams** for complex tasks
 - **Ensure complementary skill coverage**
 - **Define clear leadership responsibilities**
@@ -407,12 +461,14 @@
 ## 🔄 Workflow Integration
 
 ### Development Workflow Integration
+
 - **Sprint planning task assignment**
 - **Code review specialist selection**
 - **Bug triage and routing**
 - **Knowledge sharing session planning**
 
 ### Tool Integration Points
+
 - **IDE plugin for real-time persona suggestions**
 - **Project management tool automation**
 - **Documentation system cross-referencing**
@@ -423,11 +479,13 @@
 ## 📊 Success Metrics
 
 ### Accuracy Metrics
+
 - **Persona-task matching accuracy** (>90%)
 - **Team composition effectiveness** (>85% satisfaction)
 - **Task completion time improvement** (>20% faster)
 
 ### Quality Metrics
+
 - **Code quality improvement** (fewer bugs)
 - **Knowledge transfer effectiveness** (skill development)
 - **Collaboration efficiency** (communication overhead reduction)
@@ -437,26 +495,32 @@
 ## 📚 Usage Examples
 
 ### Example 1: New Feature - "Batch Video Processing"
+
 **Task Analysis**:
+
 - Keywords: "batch", "multiple videos", "queue"
 - Technologies: React, Electron, FFmpeg
 - Complexity: High (multiple components, state management)
 - Collaboration: Full-stack required
 
 **Recommended Team**:
+
 - **Lead**: `electron-integration-specialist` (queue management)
 - **Frontend**: `react-typescript-architect` (UI components)
 - **Processing**: `video-processing-expert` (FFmpeg optimization)
 - **UX**: `ui-ux-designer` (progress indication)
 
 ### Example 2: Bug Fix - "Memory Leak on Large Files"
+
 **Task Analysis**:
+
 - Keywords: "memory leak", "large files", "crash"
 - Technologies: Electron, React, file processing
 - Complexity: Medium (specific issue)
 - Collaboration: Debugging focused
 
 **Recommended Team**:
+
 - **Lead**: `bug-detective` (root cause analysis)
 - **Support**: `performance-engineer` (memory optimization)
 - **Validation**: `testing-engineer` (regression testing)
@@ -466,18 +530,21 @@
 ## 🚀 Implementation Roadmap
 
 ### Phase 1: Foundation
+
 - [ ] Create persona database
 - [ ] Develop task analysis algorithm
 - [ ] Build matching engine
 - [ ] Create team composition rules
 
 ### Phase 2: Integration
+
 - [ ] IDE plugin development
 - [ ] Project management tool integration
 - [ ] Documentation system linking
 - [ ] Feedback collection system
 
 ### Phase 3: Optimization
+
 - [ ] Machine learning for matching improvement
 - [ ] Performance analytics
 - [ ] Continuous improvement loop
@@ -488,12 +555,14 @@
 ## 📖 Documentation & Maintenance
 
 ### Regular Updates
+
 - **Monthly**: Persona skill updates
 - **Quarterly**: Task pattern analysis
 - **Bi-annually**: Team composition review
 - **Annually**: System architecture evaluation
 
 ### Knowledge Management
+
 - **Decision logging**: Track persona assignment rationale
 - **Success metrics**: Measure team effectiveness
 - **Lessons learned**: Document best practices

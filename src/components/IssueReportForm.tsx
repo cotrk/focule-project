@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import type { WindowExtensions, MemoryInfo, SystemInfo } from '../types';
 
 interface IssueReportFormProps {
   onClose: () => void;
@@ -70,7 +71,7 @@ export function IssueReportForm({ onClose, initialData }: IssueReportFormProps):
   }, []);
 
   const handleEmailChoice = (emailType: 'gmail' | 'outlook' | 'mailto'): void => {
-    const emailData = (window as any).emailReportData;
+    const emailData = (window as WindowExtensions).emailReportData;
     if (emailData && emailData[emailType]) {
       window.open(emailData[emailType], '_blank');
       setShowEmailOptions(false);

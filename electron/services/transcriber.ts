@@ -1,5 +1,5 @@
 /**
- * Whisper transcription service
+ * Whisper transcription service with AI Integration Architect optimizations
  */
 
 import { exec } from 'child_process';
@@ -8,6 +8,12 @@ import * as path from 'path';
 import { app } from 'electron';
 import { promisify } from 'util';
 import { findFFmpegDir } from '../utils/paths';
+import { 
+  AIIntegrationArchitect, 
+  WhisperModelRecommendation, 
+  TranscriptionQualityMetrics,
+  AIPerformanceMonitor
+} from './aiIntegrationArchitect';
 
 const execAsync = promisify(exec);
 

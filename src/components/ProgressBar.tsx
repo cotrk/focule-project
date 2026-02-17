@@ -78,26 +78,26 @@ export function ProgressBar({ label, percent, status, details, showTips = true }
       case 'model-info':
         return baseStyle + "bg-purple-500/10 border-purple-500/20 text-purple-400";
       default:
-        return baseStyle + "bg-[var(--focule-bg-secondary)] border-[var(--focule-border-subtle)] text-[var(--focule-text-muted)]";
+        return baseStyle + "bg-focule-bg-secondary border-focule-border-subtle text-focule-text-muted";
     }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="text-[var(--focule-primary-light)]">
+        <div className="text-focule-primary-light">
           {icon}
         </div>
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-[var(--focule-text-primary)]">{label}</span>
-            <span className="text-sm text-[var(--focule-text-muted)] font-mono tabular-nums">
+            <span className="text-sm font-medium text-focule-text-primary">{label}</span>
+            <span className="text-sm text-focule-text-muted font-mono tabular-nums">
               {Math.round(percent)}%
             </span>
           </div>
-          <div className="w-full bg-[var(--focule-bg-secondary)] rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-focule-bg-secondary rounded-full h-1.5 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-[var(--focule-primary)] to-[var(--focule-accent)] rounded-full transition-all duration-500 ease-out"
+              className="h-full bg-gradient-to-r from-focule-primary to-focule-accent rounded-full transition-all duration-500 ease-out"
               style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
             />
           </div>
@@ -105,11 +105,11 @@ export function ProgressBar({ label, percent, status, details, showTips = true }
       </div>
       
       {status && (
-        <p className="text-sm text-[var(--focule-text-secondary)] pl-7">{status}</p>
+        <p className="text-sm text-focule-text-secondary pl-7">{status}</p>
       )}
       
       {details && (
-        <p className="text-xs text-[var(--focule-text-muted)] pl-7">{details}</p>
+        <p className="text-xs text-focule-text-muted pl-7">{details}</p>
       )}
 
       {/* Dynamic Tips Section */}

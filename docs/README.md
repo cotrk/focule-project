@@ -24,6 +24,19 @@ Technical documentation for engineering team
 | [API_REFERENCE.md](./development/API_REFERENCE.md) | IPC contract & service APIs | Developers |
 | [CONTRIBUTING.md](./development/CONTRIBUTING.md) | Contribution guidelines | Developers |
 | [TROUBLESHOOTING.md](./development/TROUBLESHOOTING.md) | Common issues & solutions | Developers |
+| [PERFORMANCE_OPTIMIZATION.md](./development/PERFORMANCE_OPTIMIZATION.md) | Performance tuning & monitoring | Developers |
+| [CODE_QUALITY_STANDARDS.md](./development/CODE_QUALITY_STANDARDS.md) | Code quality guidelines & metrics | Developers |
+
+### 🤖 AI Specialist Personas (`/_focule_ai_agents/`)
+Specialized AI agents for development assistance
+
+| Persona | Expertise | Use Case |
+|----------|---------|----------|
+| [Performance Optimization Specialist](./_focule_ai_agents/PERFORMANCE_OPTIMIZATION_SPECIALIST.md) | Memory management, CPU optimization | Performance bottlenecks, bundle analysis |
+| [AI Integration Architect](./_focule_ai_agents/AI_INTEGRATION_ARCHITECT.md) | Whisper/Ollama optimization | AI workflows, prompt engineering |
+| [Error Recovery Specialist](./_focule_ai_agents/ERROR_RECOVERY_SPECIALIST.md) | Robust error handling | Graceful degradation, user messaging |
+| [Code Quality Guardian](./_focule_ai_agents/CODE_QUALITY_GUARDIAN.md) | Type safety, refactoring | Code quality, duplicate elimination |
+| [Documentation Specialist](./_focule_ai_agents/DOCUMENTATION_SPECIALIST.md) | Technical documentation | Documentation management, standards |
 
 ### 🎨 Design (`/design/`)
 User experience and interface documentation
@@ -106,11 +119,19 @@ Historical and deprecated documentation
 - **Designer:** DESIGN_SYSTEM.md → USER_FLOWS.md → VISUAL_REFERENCE.md
 - **Product Manager:** EXECUTIVE_SUMMARY.md → FEATURES.md → ROADMAP.md
 - **DevOps Engineer:** DEPLOYMENT.md → EXTERNAL_TOOLS.md → TROUBLESHOOTING.md
+- **Performance Engineer:** PERFORMANCE_OPTIMIZATION.md → AI Specialist Personas
+- **AI Developer:** AI Integration Architect → PERFORMANCE_OPTIMIZATION.md
+- **Code Quality Engineer:** Code Quality Guardian → CONTRIBUTING.md
 
 ### By Task
 - **Onboarding:** SETUP.md → ARCHITECTURE.md → CONTRIBUTING.md
 - **Feature Development:** FEATURES.md → API_REFERENCE.md → DESIGN_SYSTEM.md
 - **Bug Fixing:** TROUBLESHOOTING.md → API_REFERENCE.md → ARCHITECTURE.md
+- **Performance Optimization:** PERFORMANCE_OPTIMIZATION.md → AI Specialist Personas
+- **Code Quality:** Code Quality Guardian → CONTRIBUTING.md → API_REFERENCE.md
+- **AI Integration:** AI Integration Architect → PERFORMANCE_OPTIMIZATION.md
+- **Error Handling:** Error Recovery Specialist → TROUBLESHOOTING.md
+- **Documentation:** Documentation Specialist → MAINTENANCE.md
 - **Release:** DEPLOYMENT.md → FEATURES.md → EXECUTIVE_SUMMARY.md
 
 ---

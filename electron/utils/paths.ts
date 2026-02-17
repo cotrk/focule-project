@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 const userProfile = os.homedir();
+const foculeTools = process.env.FOCULETOOLS || 'C:\\Users\\Cody\\Tools';
 
 // Custom paths set by user through settings
 let customPaths: Record<string, string> = {};
@@ -29,27 +30,11 @@ export function loadCustomPaths(paths: Record<string, string>): void {
  */
 export function getFFmpegPaths(): string[] {
   return [
-    // Custom path first
-    customPaths['FFmpeg'],
-    // User home directory installations
-    path.join(userProfile, 'ffmpeg-8.0.1-essentials_build', 'bin', 'ffmpeg.exe'),
-    path.join(userProfile, 'ffmpeg-8.0.1', 'bin', 'ffmpeg.exe'),
-    path.join(userProfile, 'ffmpeg', 'bin', 'ffmpeg.exe'),
-    path.join(userProfile, 'ffmpeg', 'ffmpeg.exe'),
-    // Common Windows locations
-    'C:\\ffmpeg\\bin\\ffmpeg.exe',
-    'C:\\ffmpeg\\ffmpeg.exe',
-    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'ffmpeg', 'bin', 'ffmpeg.exe'),
-    path.join(process.env.PROGRAMFILES || '', 'ffmpeg', 'bin', 'ffmpeg.exe'),
-    // Chocolatey/Scoop
-    'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
-    path.join(userProfile, 'scoop', 'shims', 'ffmpeg.exe'),
-    // Bundled with other software
-    'C:\\Program Files\\Topaz Labs LLC\\Topaz Video AI\\ffmpeg.exe',
-    'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\ffmpeg.exe',
-    // yt-dlp often bundles ffmpeg
-    path.join(process.env.APPDATA || '', 'yt-dlp', 'ffmpeg.exe'),
-  ].filter(Boolean) as string[];
+    // Check bundled tools in public directory first (self-contained distribution)
+    path.join(process.cwd(), 'public', 'ffmpeg.exe'),
+    // FoculeTools directory (your custom tools location)
+    path.join(foculeTools, 'ffmpeg.exe'),
+  ].filter(Boolean);
 }
 
 /**
@@ -86,17 +71,10 @@ export function findFFmpegDir(): string | undefined {
  */
 export function getYtDlpPaths(): string[] {
   return [
-    // Custom path first
-    customPaths['yt-dlp'],
-    // App bundled
-    path.join(process.cwd(), 'assets', 'yt-dlp.exe'),
-    path.join(process.cwd(), 'assets', 'yt-dlp'),
-    // Common Windows locations
-    path.join(userProfile, 'yt-dlp', 'yt-dlp.exe'),
-    path.join(process.env.APPDATA || '', 'yt-dlp', 'yt-dlp.exe'),
-    // Scoop/Chocolatey
-    path.join(userProfile, 'scoop', 'shims', 'yt-dlp.exe'),
-    'C:\\ProgramData\\chocolatey\\bin\\yt-dlp.exe',
+    // Check bundled tools in public directory first (self-contained distribution)
+    path.join(process.cwd(), 'public', 'yt-dlp.exe'),
+    // FoculeTools directory (your custom tools location)
+    path.join(foculeTools, 'yt-dlp.exe'),
   ].filter(Boolean) as string[];
 }
 
@@ -124,6 +102,29 @@ export function findYtDlp(): CommandWithArgs {
 }
 
 /**
+ * Find Whisper executable
+ */
+export function findWhisper(): string {
+  const whisperPaths = [
+    // Check bundled tools in public directory first (self-contained distribution)
+    path.join(process.cwd(), 'public', 'whisper.exe'),
+    // FoculeTools directory (your custom tools location)
+    path.join(foculeTools, 'whisper.exe'),
+  ];
+
+  for (const whisperPath of whisperPaths) {
+    if (whisperPath && fs.existsSync(whisperPath)) {
+      console.log(`[Paths] Found Whisper at: ${whisperPath}`);
+      return whisperPath;
+    }
+  }
+
+  // Fall back to Python module
+  console.log('[Paths] Using Python module: python -c whisper');
+  return 'python';
+}
+
+/**
  * Video file extensions we support
  */
 export const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mkv', '.flv', '.avi', '.ts', '.m4v', '.mov'];
@@ -134,4 +135,3 @@ export const MEDIA_EXTENSIONS = [...VIDEO_EXTENSIONS, ...AUDIO_EXTENSIONS];
  * Extensions that indicate a failed download
  */
 export const INVALID_EXTENSIONS = ['.mhtml', '.html', '.htm', '.json', '.part'];
-

@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { logger } from '../utils/logger';
+import { ErrorHandler } from '../utils/errors';
 import type { ElectronAPI } from '../types/electron';
 
 declare global {
@@ -80,14 +82,14 @@ function ActionButton({ action, variant = 'primary' }: { action: ToolAction; var
       install: `${baseClass} bg-gradient-to-r from-[#00F0FF] to-[#BD00FF] text-black hover:shadow-lg hover:shadow-[#00F0FF]/50`,
       learn: `${baseClass} bg-[#BD00FF]/10 text-[#BD00FF] hover:bg-[#BD00FF]/20`,
       skip: `${baseClass} text-[var(--focule-text-muted)] hover:text-[var(--focule-text-secondary)]`,
-      locate: `${baseClass} bg-white/10 text-white border border-white/20 hover:bg-white/20`,
+      locate: `${baseClass} bg-[var(--focule-bg-tertiary)] text-[var(--focule-text-primary)] border border-[var(--focule-border)] hover:bg-[var(--focule-bg-secondary)]`,
     },
     secondary: {
       download: `${baseClass} bg-[var(--focule-bg-secondary)] text-[var(--focule-text-secondary)] hover:bg-[var(--focule-bg-tertiary)] hover:text-[var(--focule-primary)]`,
       install: `${baseClass} bg-[var(--focule-bg-secondary)] text-[var(--focule-text-secondary)] hover:bg-[var(--focule-bg-tertiary)] hover:text-[var(--focule-primary)]`,
       learn: `${baseClass} bg-[#BD00FF]/10 text-[#BD00FF] hover:bg-[#BD00FF]/20`,
       skip: `${baseClass} text-[var(--focule-text-muted)] hover:text-[var(--focule-text-secondary)]`,
-      locate: `${baseClass} bg-white/10 text-white border border-white/20 hover:bg-white/20`,
+      locate: `${baseClass} bg-[var(--focule-bg-tertiary)] text-[var(--focule-text-primary)] border border-[var(--focule-border)] hover:bg-[var(--focule-bg-secondary)]`,
     }
   };
 
@@ -203,17 +205,28 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
 
   const [allCriticalInstalled, setAllCriticalInstalled] = useState(false);
   const [skipped, setSkipped] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   // Enhanced locate tool function using proper ElectronAPI
   const handleLocateTool = async (toolName: string, humanName: string) => {
     try {
       if (window.electronAPI && window.electronAPI.prerequisites) {
+        // Map frontend names to backend names
+        const backendNameMap: Record<string, string> = {
+          'ffmpeg': 'Media Processor',
+          'yt-dlp': 'Video Downloader', 
+          'whisper': 'Voice Recognition',
+          'ollama': 'AI Engine'
+        };
+        
+        const backendName = backendNameMap[toolName] || toolName;
+        
         // Use the proper browsePath method from the complete ElectronAPI
-        const path = await window.electronAPI.prerequisites.browsePath(toolName);
+        const path = await window.electronAPI.prerequisites.browsePath(backendName);
         
         if (path) {
           // Save the path using the proper setPath method
-          await window.electronAPI.prerequisites.setPath(toolName, path);
+          await window.electronAPI.prerequisites.setPath(backendName, path);
           
           // Show success toast
           showToast(`✓ ${humanName} location saved. Refreshing...`, 'success');
@@ -230,7 +243,12 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
         showToast('❌ ElectronAPI not available', 'error');
       }
     } catch (error) {
-      console.error('Failed to locate tool:', error);
+      const appError = ErrorHandler.handle(error, 'prerequisites');
+      logger.error(`Failed to locate ${humanName}`, 'prerequisites', {
+        tool: toolName,
+        error: appError.message,
+        recoveryStrategies: ErrorHandler.getRecoveryStrategies(appError)
+      });
       showToast(`❌ Failed to locate ${humanName}`, 'error');
     }
   };
@@ -265,13 +283,30 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
 
   // Enhanced function to check prerequisites using ElectronAPI
   const checkPrerequisitesStatus = useCallback(async () => {
+    // Prevent duplicate checks
+    if (isChecking) {
+      return;
+    }
+    
+    setIsChecking(true);
+    
     try {
       if (window.electronAPI?.prerequisites?.check) {
         const result = await window.electronAPI.prerequisites.check();
         if (result.success && result.tools) {
           // Update prerequisites state based on actual check
           setPrerequisites((prev: PrerequisiteStatus[]) => prev.map((prereq: PrerequisiteStatus) => {
-            const toolInfo = result.tools[prereq.name];
+            // Map frontend names to backend names
+            const backendNameMap: Record<string, string> = {
+              'ffmpeg': 'Media Processor',
+              'yt-dlp': 'Video Downloader', 
+              'whisper': 'Voice Recognition',
+              'ollama': 'AI Engine'
+            };
+            
+            const backendName = backendNameMap[prereq.name];
+            const toolInfo = backendName ? result.tools[backendName] : null;
+            
             if (toolInfo) {
               return {
                 ...prereq,
@@ -286,11 +321,11 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
       }
       
       // Fallback: If ElectronAPI check fails, use localStorage or default to installed for testing
-      console.log('Using fallback prerequisites check');
+      console.warn('Using fallback prerequisites check');
       setPrerequisites((prev: PrerequisiteStatus[]) => prev.map((prereq: PrerequisiteStatus) => {
         // For now, assume tools are installed if user can transcribe
         // This is a temporary fix until ElectronAPI is properly working
-        if (prereq.name === 'ffmpeg' || prereq.name === 'yt-dlp' || prereq.name === 'whisper') {
+        if (prereq.name === 'ffmpeg' || prereq.name === 'yt-dlp' || prereq.name === 'whisper' || prereq.name === 'ollama') {
           return {
             ...prereq,
             installed: true,
@@ -300,7 +335,11 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
         return prereq;
       }));
     } catch (error) {
-      console.error('Failed to check prerequisites:', error);
+      const appError = ErrorHandler.handle(error, 'prerequisites');
+      logger.error('Failed to check prerequisites', 'prerequisites', {
+        error: appError.message,
+        recoveryStrategies: ErrorHandler.getRecoveryStrategies(appError)
+      });
       // Fallback to assuming critical tools are installed
       setPrerequisites((prev: PrerequisiteStatus[]) => prev.map((prereq: PrerequisiteStatus) => {
         if (prereq.severity === 'critical') {
@@ -312,13 +351,40 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
         }
         return prereq;
       }));
+    } finally {
+      setIsChecking(false);
+      // Cache the results for 5 minutes
+      localStorage.setItem('focule_prerequisites_last_check', Date.now().toString());
+      localStorage.setItem('focule_prerequisites_cached', JSON.stringify(prerequisites));
     }
-  }, []);
+  }, [isChecking]);
 
-  // Check prerequisites on component mount
+  // Check prerequisites on component mount (with debounce and cache)
   useEffect(() => {
-    checkPrerequisitesStatus();
-  }, [checkPrerequisitesStatus]);
+    // Check if we've already verified prerequisites recently
+    const lastCheck = localStorage.getItem('focule_prerequisites_last_check');
+    const now = Date.now();
+    
+    // If checked within last 5 minutes, use cached results
+    if (lastCheck && (now - parseInt(lastCheck)) < 300000) {
+      const cachedResults = localStorage.getItem('focule_prerequisites_cached');
+      if (cachedResults) {
+        try {
+          const cached = JSON.parse(cachedResults);
+          setPrerequisites(cached);
+          return;
+        } catch {
+          // Invalid cache, proceed with check
+        }
+      }
+    }
+    
+    const timeoutId = setTimeout(() => {
+      checkPrerequisitesStatus();
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     const criticalCount = prerequisites.filter(p => p.severity === 'critical' && p.installed).length;
@@ -335,7 +401,7 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
       onClick={handleBackdropClick}
     >
       <div className="bg-[var(--focule-bg-secondary)] border border-[var(--focule-border)] rounded-2xl shadow-2xl max-w-lg w-full p-8 max-h-[90vh] overflow-y-auto">
@@ -390,20 +456,20 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-[var(--focule-heading)]">
                 Required Tools ({missingCritical.length})
               </h3>
             </div>
             
             <div className="space-y-4">
               {missingCritical.map((prereq) => (
-                <div key={prereq.name} className="bg-red-500/5 border border-red-500/20 rounded-lg p-4">
+                <div key={prereq.name} className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <div className="mt-1">
                       {Icons.alert}
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-semibold text-white mb-1">
+                      <h4 className="font-semibold text-[var(--focule-heading)] mb-1">
                         {prereq.humanName}
                       </h4>
                       <p className="text-sm text-[var(--focule-text-secondary)] leading-relaxed">
@@ -422,7 +488,7 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
                     {prereq.actions?.secondary && (
                       <button
                         onClick={() => handleLocateTool(prereq.name, prereq.humanName)}
-                        className="px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focule-primary)] bg-white/10 text-white border border-white/20 hover:bg-white/20"
+                        className="px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focule-primary)] bg-[var(--focule-bg-tertiary)] text-[var(--focule-text-primary)] border border-[var(--focule-border)] hover:bg-[var(--focule-bg-secondary)]"
                       >
                         {Icons.folder}
                         <span>{prereq.actions.secondary.label}</span>

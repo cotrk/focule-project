@@ -62,7 +62,7 @@ interface URLInputRedesignedProps {
 }
 
 export function URLInputRedesigned({ onStart, disabled }: URLInputRedesignedProps): JSX.Element {
-  const [url, setUrl] = useState('');
+  const { state, startTranscription, reset, retry } = useTranscription();
   const [error, setError] = useState('');
   const [isValid, setIsValid] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -284,6 +284,17 @@ export function URLInputRedesigned({ onStart, disabled }: URLInputRedesignedProp
               <span className="mt-0.5">{Icons.alertCircle}</span>
               <span>{error}</span>
             </p>
+          )}
+          
+          {/* TRY AGAIN BUTTON - Only show when there's an error */}
+          {state.status === 'error' && error && (
+            <button
+              type="button"
+              onClick={retry}
+              className="mt-3 px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              <span>Try Again</span>
+            </button>
           )}
 
           {/* HELPER TEXT - Contextual */}

@@ -1,0 +1,369 @@
+/**
+ * Lightweight Monitoring & Analytics Service
+ * Built-in error tracking, performance monitoring, and user analytics
+ */
+
+import { app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+interface ErrorReport {
+  timestamp: string;
+  error: string;
+  stack?: string;
+  userAgent?: string;
+  sessionId?: string;
+  step?: string;
+}
+
+interface PerformanceMetrics {
+  timestamp: string;
+  cpu: number;
+  memory: number;
+  diskUsage: number;
+  activeProcesses: number;
+}
+
+interface UserAction {
+  timestamp: string;
+  action: string;
+  details?: any;
+  duration?: number;
+}
+
+interface SystemInfo {
+  timestamp: string;
+  platform: string;
+  arch: string;
+  nodeVersion: string;
+  electronVersion: string;
+  totalMemory: number;
+  freeMemory: number;
+}
+
+export class LightweightMonitor {
+  private static readonly LOG_DIR = path.join(app.getPath('userData'), 'logs');
+  private static readonly METRICS_FILE = path.join(app.getPath('userData'), 'metrics.json');
+  private static readonly ACTIONS_FILE = path.join(app.getPath('userData'), 'actions.json');
+  private static readonly ERROR_REPORTS_FILE = path.join(app.getPath('userData'), 'errors.json');
+  
+  private errorReports: ErrorReport[] = [];
+  private userActions: UserAction[] = [];
+  private metrics: PerformanceMetrics[] = [];
+  private systemInfo: SystemInfo | null = null;
+
+  /**
+   * Initialize monitoring system
+   */
+  static async initialize(): Promise<void> {
+    console.log('[Monitor] 🚀 Initializing lightweight monitoring...');
+    
+    // Ensure log directory exists
+    if (!fs.existsSync(this.LOG_DIR)) {
+      fs.mkdirSync(this.LOG_DIR, { recursive: true });
+    }
+
+    // Load existing data
+    await this.loadExistingData();
+    
+    // Set up error handling
+    this.setupErrorHandling();
+    
+    // Start performance monitoring
+    this.startPerformanceMonitoring();
+    
+    // Log system info
+    await this.logSystemInfo();
+    
+    console.log('[Monitor] ✅ Lightweight monitoring initialized');
+  }
+
+  /**
+   * Load existing monitoring data
+   */
+  private static async loadExistingData(): Promise<void> {
+    try {
+      // Load error reports
+      if (fs.existsSync(this.ERROR_REPORTS_FILE)) {
+        const data = fs.readFileSync(this.ERROR_REPORTS_FILE, 'utf-8');
+        this.errorReports = JSON.parse(data);
+      }
+
+      // Load metrics
+      if (fs.existsSync(this.METRICS_FILE)) {
+        const data = fs.readFileSync(this.METRICS_FILE, 'utf-8');
+        this.metrics = JSON.parse(data);
+      }
+
+      // Load user actions
+      if (fs.existsSync(this.ACTIONS_FILE)) {
+        const data = fs.readFileSync(this.ACTIONS_FILE, 'utf-8');
+        this.userActions = JSON.parse(data);
+      }
+    } catch (error) {
+      console.error('[Monitor] Failed to load existing data:', error);
+    }
+  }
+
+  /**
+   * Setup global error handling
+   */
+  private static setupErrorHandling(): void {
+    process.on('uncaughtException', (error, origin) => {
+      this.logError(error, 'Uncaught Exception', { origin });
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      this.logError(reason, 'Unhandled Rejection', { promise });
+    });
+
+    // Console error override
+    const originalConsoleError = console.error;
+    console.error = (...args: any[]) => {
+      this.logError(args[0], 'Console Error', { args: args.slice(1) });
+      originalConsoleError.apply(console, args);
+    };
+  }
+
+  /**
+   * Start performance monitoring
+   */
+  private static startPerformanceMonitoring(): void {
+    setInterval(() => {
+      const metrics = this.collectPerformanceMetrics();
+      this.metrics.push(metrics);
+      
+      // Keep only last 100 metrics to prevent memory bloat
+      if (this.metrics.length > 100) {
+        this.metrics = this.metrics.slice(-100);
+      }
+      
+      this.saveMetrics();
+    }, 30000); // Every 30 seconds
+  }
+
+  /**
+   * Collect system performance metrics
+   */
+  private static collectPerformanceMetrics(): PerformanceMetrics {
+    const cpus = os.cpus();
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    
+    // Count active processes (simplified)
+    const activeProcesses = this.metrics.length + 1; // Rough estimate
+
+    return {
+      timestamp: new Date().toISOString(),
+      cpu: cpus[0]?.speed || 0,
+      memory: totalMemory - freeMemory,
+      diskUsage: 0, // Could be enhanced with actual disk usage
+      activeProcesses
+    };
+  }
+
+  /**
+   * Log system information
+   */
+  private static async logSystemInfo(): Promise<void> {
+    const systemInfo: SystemInfo = {
+      timestamp: new Date().toISOString(),
+      platform: os.platform(),
+      arch: os.arch(),
+      nodeVersion: process.version,
+      electronVersion: app.getVersion(),
+      totalMemory: os.totalmem(),
+      freeMemory: os.freemem()
+    };
+
+    this.systemInfo = systemInfo;
+    this.saveSystemInfo();
+  }
+
+  /**
+   * Log an error report
+   */
+  static logError(error: Error, context: string, additional?: any): void {
+    const report: ErrorReport = {
+      timestamp: new Date().toISOString(),
+      error: error.message || String(error),
+      stack: error.stack,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      sessionId: this.getSessionId(),
+      step: context,
+      ...additional
+    };
+
+    this.errorReports.push(report);
+    this.saveErrorReports();
+    
+    // Also log to console for development
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[${context}]`, error);
+    }
+  }
+
+  /**
+   * Log user action
+   */
+  static logAction(action: string, details?: any): void {
+    const userAction: UserAction = {
+      timestamp: new Date().toISOString(),
+      action,
+      details,
+      duration: details?.duration || 0
+    };
+
+    this.userActions.push(userAction);
+    this.saveUserActions();
+  }
+
+  /**
+   * Get session ID
+   */
+  private static getSessionId(): string {
+    return Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * Save error reports
+   */
+  private static saveErrorReports(): void {
+    try {
+      // Keep only last 50 reports to prevent file bloat
+      const reports = this.errorReports.slice(-50);
+      fs.writeFileSync(this.ERROR_REPORTS_FILE, JSON.stringify(reports, null, 2));
+    } catch (error) {
+      console.error('[Monitor] Failed to save error reports:', error);
+    }
+  }
+
+  /**
+   * Save metrics
+   */
+  private static saveMetrics(): void {
+    try {
+      // Keep only last 100 metrics
+      const metrics = this.metrics.slice(-100);
+      fs.writeFileSync(this.METRICS_FILE, JSON.stringify(metrics, null, 2));
+    } catch (error) {
+      console.error('[Monitor] Failed to save metrics:', error);
+    }
+  }
+
+  /**
+   * Save user actions
+   */
+  private static saveUserActions(): void {
+    try {
+      // Keep only last 200 actions
+      const actions = this.userActions.slice(-200);
+      fs.writeFileSync(this.ACTIONS_FILE, JSON.stringify(actions, null, 2));
+    } catch (error) {
+      console.error('[Monitor] Failed to save user actions:', error);
+    }
+  }
+
+  /**
+   * Save system info
+   */
+  private static saveSystemInfo(): void {
+    try {
+      fs.writeFileSync(this.METRICS_FILE, JSON.stringify({
+        systemInfo: this.systemInfo,
+        lastUpdated: new Date().toISOString()
+      }, null, 2));
+    } catch (error) {
+      console.error('[Monitor] Failed to save system info:', error);
+    }
+  }
+
+  /**
+   * Get monitoring data for UI
+   */
+  static async getMonitoringData(): Promise<{
+    errorReports: ErrorReport[];
+    metrics: PerformanceMetrics[];
+    userActions: UserAction[];
+    systemInfo: SystemInfo | null;
+  }> {
+    return {
+      errorReports: this.errorReports.slice(-10), // Last 10 errors
+      metrics: this.metrics.slice(-10), // Last 10 metrics
+      userActions: this.userActions.slice(-20), // Last 20 actions
+      systemInfo: this.systemInfo
+    };
+  }
+
+  /**
+   * Get health status
+   */
+  static getHealthStatus(): {
+    const recentErrors = this.errorReports.slice(-5);
+    const errorRate = recentErrors.length / 5; // Errors in last 5 minutes
+    
+    let status = 'healthy';
+    if (errorRate > 2) status = 'warning';
+    if (errorRate > 5) status = 'critical';
+    
+    return {
+      status,
+      errorRate,
+      totalErrors: this.errorReports.length,
+      uptime: process.uptime()
+    };
+  }
+    
+    let status = 'healthy';
+    if (errorRate > 2) status = 'warning';
+    if (errorRate > 5) status = 'critical';
+    
+    return {
+      status,
+      errorRate,
+      totalErrors: this.errorReports.length,
+      uptime: process.uptime()
+    };
+  }
+
+  /**
+   * Clean up old data
+   */
+  static async cleanup(): Promise<void> {
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    
+    // Clean old error reports
+    if (fs.existsSync(this.ERROR_REPORTS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(this.ERROR_REPORTS_FILE, 'utf-8'));
+      const filtered = data.filter((report: ErrorReport) => {
+        const age = Date.now() - new Date(report.timestamp).getTime();
+        return age < maxAge;
+      });
+      
+      fs.writeFileSync(this.ERROR_REPORTS_FILE, JSON.stringify(filtered, null, 2));
+    }
+
+    // Clean old metrics
+    if (fs.existsSync(this.METRICS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(this.METRICS_FILE, 'utf-8'));
+      const filtered = data.filter((_: any, index: number) => {
+        const age = Date.now() - new Date(_.timestamp).getTime();
+        return age < maxAge;
+      });
+      
+      fs.writeFileSync(this.METRICS_FILE, JSON.stringify(filtered, null, 2));
+    }
+
+    // Clean old user actions
+    if (fs.existsSync(this.ACTIONS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(this.ACTIONS_FILE, 'utf-8'));
+      const filtered = data.filter((_: any, index: number) => {
+        const age = Date.now() - new Date(_.timestamp).getTime();
+        return age < maxAge;
+      });
+      
+      fs.writeFileSync(this.ACTIONS_FILE, JSON.stringify(filtered, null, 2));
+    }
+  }
+}

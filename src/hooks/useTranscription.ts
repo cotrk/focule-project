@@ -1,30 +1,28 @@
 import { useState, useCallback } from 'react';
-
-export interface SocialContent {
-  hooks: string[];
-  description: string;
-  hashtags: string[];
-  keywords: string[];
-  filenames: string[];
-  imagePrompts: string[];
-}
-
-interface TranscriptionState {
-  status: 'idle' | 'downloading' | 'extracting' | 'transcribing' | 'processing' | 'complete' | 'error';
-  progress: number;
-  message: string;
-  result?: {
-    transcript: string;
-    transcriptWithTimestamps: string;
-    socialContent?: SocialContent;
-    title: string;
-    videoPath?: string;
-    audioPath?: string;
-    ollamaModel?: string;
-    whisperModel?: string;
-  };
-  error?: string;
-}
+import { ErrorClassificationService } from '../services/ErrorClassificationService';
+import { logger } from '../utils/logger';
+import { 
+  handleServiceResult,
+  createProgressUpdater,
+  withProgressTracking,
+  validateVideoURL,
+  getErrorMessage,
+  createSessionContext,
+  ERROR_MESSAGES
+} from '../utils/serviceHelpers';
+import { 
+  TranscriptionError,
+  ElectronAPIError,
+  VideoProcessingError,
+  AIModelError
+} from '../utils/errorHandling';
+import type { 
+  SocialContent, 
+  TranscriptionState, 
+  DownloadVideoResult, 
+  DownloadProgress, 
+  TranscriptionProgress 
+} from '../types';
 
 export function useTranscription() {
   const [state, setState] = useState<TranscriptionState>({
@@ -33,38 +31,80 @@ export function useTranscription() {
     message: '',
   });
 
+  const classificationService = ErrorClassificationService.getInstance();
+
   const startTranscription = useCallback(async (url: string) => {
-    if (!window.electronAPI) {
+    // Validate input URL first
+    const urlValidation = validateVideoURL(url);
+    if (!urlValidation.isValid) {
       setState({
         status: 'error',
         progress: 0,
-        message: 'Electron API not available',
-        error: 'This app must be run in Electron',
+        message: urlValidation.error || ERROR_MESSAGES.INVALID_URL,
+        error: urlValidation.error || ERROR_MESSAGES.INVALID_URL,
       });
       return;
     }
 
+    if (!window.electronAPI) {
+      const error = new ElectronAPIError(ERROR_MESSAGES.ELECTRON_API_UNAVAILABLE);
+      setState({
+        status: 'error',
+        progress: 0,
+        message: error.message,
+        error: error.message,
+      });
+      return;
+    }
+
+    // Create session context for tracking
+    const sessionContext = createSessionContext();
+    let downloadResult: DownloadVideoResult | null = null;
+
     try {
+      // Set up progress tracking
+      const updateProgress = createProgressUpdater(
+        (update) => setState(prev => ({ ...prev, ...update })),
+        0, // Base progress
+        25 // Progress range for download (0-25%)
+      );
+
+      // Set up progress listeners
+      window.electronAPI.onDownloadProgress((progress: DownloadProgress) => {
+        updateProgress(
+          progress.percent || 0,
+          `Downloading: ${progress.downloaded || ''} / ${progress.total || ''}`,
+          progress.speed ? `Speed: ${progress.speed}` : undefined
+        );
+      });
+
+      // Download video with enhanced error handling
       setState({
         status: 'downloading',
         progress: 0,
         message: 'Downloading video...',
       });
 
-      // Set up progress listeners
-      window.electronAPI.onDownloadProgress((progress: any) => {
-        setState((prev) => ({
-          ...prev,
-          progress: progress.percent || 0,
-          message: `Downloading: ${progress.downloaded || ''} / ${progress.total || ''}`,
-        }));
-      });
-
-      // Download video
-      const downloadResult = await window.electronAPI.downloadVideo(url);
+      downloadResult = await withProgressTracking(
+        () => window.electronAPI.downloadVideo(url),
+        (update) => setState(prev => ({ ...prev, ...update })),
+        'Initializing download...',
+        'Download completed successfully'
+      );
+      
       if (!downloadResult.success) {
-        throw new Error(downloadResult.error || 'Download failed');
+        throw new VideoProcessingError(
+          downloadResult.error || ERROR_MESSAGES.DOWNLOAD_FAILED,
+          { operation: 'download', sessionId: sessionContext.sessionId }
+        );
       }
+
+      // Extract audio with enhanced error handling
+      const audioUpdateProgress = createProgressUpdater(
+        (update) => setState(prev => ({ ...prev, ...update })),
+        25, // Base progress after download
+        5 // Progress range for extraction (25-30%)
+      );
 
       setState({
         status: 'extracting',
@@ -72,11 +112,37 @@ export function useTranscription() {
         message: 'Extracting audio...',
       });
 
-      // Extract audio (pass sessionId for isolation)
-      const audioResult = await window.electronAPI.extractAudio(downloadResult.videoPath, downloadResult.sessionId);
-      if (!audioResult.success) {
-        throw new Error(audioResult.error || 'Audio extraction failed');
+      if (!downloadResult.videoPath || !downloadResult.sessionId) {
+        throw new VideoProcessingError(
+          'Download result missing required video path or session ID',
+          { operation: 'audio_extraction', sessionId: sessionContext.sessionId },
+          { videoPath: downloadResult.videoPath, sessionId: downloadResult.sessionId }
+        );
       }
+      
+      const audioResult = await withProgressTracking(
+        () => window.electronAPI.extractAudio(
+          downloadResult.videoPath!, 
+          downloadResult.sessionId!
+        ),
+        audioUpdateProgress,
+        'Preparing audio extraction...',
+        'Audio extraction completed'
+      );
+      
+      if (!audioResult.success) {
+        throw new VideoProcessingError(
+          audioResult.error || ERROR_MESSAGES.AUDIO_EXTRACTION_FAILED,
+          { operation: 'audio_extraction', sessionId: sessionContext.sessionId }
+        );
+      }
+
+      // Transcribe with enhanced error handling
+      const transcribeUpdateProgress = createProgressUpdater(
+        (update) => setState(prev => ({ ...prev, ...update })),
+        30, // Base progress after extraction
+        50 // Progress range for transcription (30-80%)
+      );
 
       setState({
         status: 'transcribing',
@@ -88,24 +154,35 @@ export function useTranscription() {
       const settings = await window.electronAPI.getSettings();
 
       // Set up transcription progress listener
-      window.electronAPI.onTranscribeProgress((progress: any) => {
-        const baseProgress = 30;
-        const progressRange = 50; // 30-80%
-        const adjustedProgress = baseProgress + (progress.percent / 100) * progressRange;
-        setState((prev) => ({
-          ...prev,
-          progress: adjustedProgress,
-          message: `Transcribing: ${progress.status || ''}`,
-        }));
+      window.electronAPI.onTranscribeProgress((progress: TranscriptionProgress) => {
+        transcribeUpdateProgress(
+          progress.percent || 0,
+          `Transcribing: ${progress.status || ''}`,
+          progress.current && progress.total 
+            ? `Progress: ${progress.current}/${progress.total}`
+            : undefined
+        );
       });
 
-      // Transcribe
-      const transcribeResult = await window.electronAPI.transcribeAudio(
-        audioResult.audioPath,
-        settings.whisperModel
+      const transcribeResult = await withProgressTracking(
+        () => window.electronAPI.transcribeAudio(
+          audioResult.audioPath || '',
+          settings.whisperModel || ''
+        ),
+        transcribeUpdateProgress,
+        'Initializing transcription...',
+        'Transcription completed successfully'
       );
+      
       if (!transcribeResult.success) {
-        throw new Error(transcribeResult.error || 'Transcription failed');
+        throw new TranscriptionError(
+          'TRANSCRIPTION_FAILED',
+          transcribeResult.error || ERROR_MESSAGES.TRANSCRIPTION_FAILED,
+          'high' as const,
+          'user_action' as const,
+          'processing' as const,
+          { operation: 'transcription', sessionId: sessionContext.sessionId }
+        );
       }
 
       setState({
@@ -117,16 +194,33 @@ export function useTranscription() {
       // Process with Ollama for social media content (optional)
       let socialContent: SocialContent | undefined;
       
-      try {
-        const ollamaResult = await window.electronAPI.processWithOllama(
-          transcribeResult.transcript,
-          settings.ollamaModel
-        );
-        if (ollamaResult.success && ollamaResult.socialContent) {
-          socialContent = ollamaResult.socialContent;
+      if (settings.ollamaModel) {
+        try {
+          const ollamaResult = await withProgressTracking(
+            () => window.electronAPI.processWithOllama(
+              transcribeResult.transcript,
+              settings.ollamaModel!
+            ),
+            (update) => setState(prev => ({ ...prev, ...update })),
+            'Generating AI content...',
+            'AI content generated successfully'
+          );
+          
+          if (ollamaResult.success && ollamaResult.socialContent) {
+            socialContent = ollamaResult.socialContent;
+          }
+        } catch (ollamaError: Error | unknown) {
+          // Log AI processing error but don't fail the entire transcription
+          const error = ollamaError instanceof Error ? ollamaError : new Error(String(ollamaError));
+          logger.warn('Ollama processing failed, continuing without social content', 'transcription', {
+            error: error.message,
+            stack: error.stack,
+            sessionId: sessionContext.sessionId
+          });
+          
+          // Optionally show a toast notification to user
+          // ToastManager.warning('AI Content Generation', 'Social content generation failed, but transcription completed successfully.');
         }
-      } catch (ollamaError: any) {
-        console.warn('Ollama processing failed, continuing without social content:', ollamaError);
       }
 
       setState({
@@ -137,19 +231,57 @@ export function useTranscription() {
           transcript: transcribeResult.transcript,
           transcriptWithTimestamps: transcribeResult.transcriptWithTimestamps,
           socialContent,
-          title: downloadResult.title || 'Untitled',
+          title: downloadResult.title ?? 'Untitled',
           videoPath: downloadResult.videoPath,
           audioPath: audioResult.audioPath,
-          ollamaModel: settings.ollamaModel,
-          whisperModel: settings.whisperModel,
+          ollamaModel: settings.ollamaModel || '',
+          whisperModel: settings.whisperModel || '',
         },
       });
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
+      // Enhanced error classification and handling
+      const appError = error instanceof Error ? error : new Error(String(error));
+      
+      // Classify error for better handling
+      const classification = classificationService.classifyError(
+        appError, 
+        {
+          operation: 'transcription',
+          sessionId: downloadResult?.sessionId || sessionContext.sessionId,
+          url,
+          platform: urlValidation.platform
+        }
+      );
+
+      // Use recovery strategies from classification
+      const recoveryStrategies = classification.error?.recoveryStrategies || [];
+      const hasRetryStrategy = recoveryStrategies.some(s => s.type === 'retry');
+      const hasFallbackStrategy = recoveryStrategies.some(s => s.type === 'fallback');
+
+      // Create user-friendly error message using standardized messages
+      let userMessage = getErrorMessage(appError, classification.error?.message);
+      
+      // Add recovery suggestions to message
+      if (hasRetryStrategy || hasFallbackStrategy) {
+        userMessage += '\n\nYou can try again or use a different approach.';
+      }
+
+      // Log the error with enhanced context
+      logger.error('Transcription failed', 'transcription', {
+        error: appError.message,
+        stack: appError.stack,
+        sessionId: sessionContext.sessionId,
+        url,
+        platform: urlValidation.platform,
+        classification: classification.error?.code,
+        recoveryStrategies: recoveryStrategies.map(s => s.type)
+      });
+
       setState({
         status: 'error',
         progress: 0,
-        message: 'Error occurred',
-        error: error.message || 'Unknown error',
+        message: userMessage,
+        error: userMessage,
       });
     } finally {
       // Clean up listeners
@@ -172,6 +304,21 @@ export function useTranscription() {
     state,
     startTranscription,
     reset,
+    retry: () => {
+      if (state.status === 'error' && urlValidation?.url) {
+        // Clear error and retry with same URL
+        setState({
+          status: 'idle',
+          progress: 0,
+          message: '',
+          error: undefined,
+        });
+        // Auto-start transcription after a short delay
+        setTimeout(() => {
+          startTranscription(urlValidation.url);
+        }, 500);
+      }
+    },
   };
 }
 

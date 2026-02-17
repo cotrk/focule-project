@@ -5,11 +5,15 @@ import { ProgressBar } from './components/ProgressBar';
 import { ResultsViewRedesigned } from './components/ResultsViewRedesigned';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PrerequisitesCheckRedesigned } from './components/PrerequisitesCheckRedesigned';
+import { OnboardingFlow } from './components/OnboardingFlow';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorDisplay } from './components/ErrorDisplay';
 import { SuccessCelebration } from './components/SuccessCelebration';
-import { GlobalIssueReporter } from './components/GlobalIssueReporter';
+import { TranscriptionErrorBoundary } from './components/TranscriptionErrorBoundary';
+import { URLInputErrorBoundary } from './components/URLInputErrorBoundary';
 import { useKeyboardShortcuts, commonShortcuts } from './hooks/useKeyboardShortcuts';
+import { logger } from './utils/logger';
 
 const APP_VERSION = '1.0.0';
 
@@ -17,6 +21,8 @@ function App(): JSX.Element {
   const { state, startTranscription, reset } = useTranscription();
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [, setAutoInstallEnabled] = useState(false);
   // Keyboard shortcuts
   useKeyboardShortcuts([
     {
@@ -36,9 +42,16 @@ function App(): JSX.Element {
   ]);
 
   useEffect(() => {
-    // Check prerequisites silently on app load
-    // The redesigned component will handle showing/hiding based on what's missing
-    // This is handled internally by PrerequisitesCheckRedesigned
+    // Check if user has completed onboarding
+    const hasCompletedOnboarding = localStorage.getItem('focule_onboarding_completed');
+    
+    if (!hasCompletedOnboarding) {
+      // Show onboarding after a short delay for smooth entrance
+      setTimeout(() => {
+        setShowOnboarding(true);
+        logger.info('Starting onboarding flow for new user', 'app');
+      }, 1000);
+    }
   }, []);
 
   // State managed by redesigned components
@@ -48,7 +61,7 @@ function App(): JSX.Element {
   // Model loading handled by redesigned component
   // useEffect(() => {
   //   if (showRunAgain && window.electronAPI) {
-  //     window.electronAPI.getOllamaModels().then((result: any) => {
+  //     window.electronAPI.getOllamaModels().then((result) => {
   //       if (result.success && result.localModels) {
   //         setAvailableModels(result.localModels);
   //       }
@@ -58,7 +71,10 @@ function App(): JSX.Element {
 
   // Export functionality for ResultsViewRedesigned
   const handleExport = async (): Promise<void> => {
-    if (!state.result || !window.electronAPI) return;
+    if (!state.result || !window.electronAPI) {
+      logger.warn('Export failed: No result or Electron API unavailable', 'app');
+      return;
+    }
     
     try {
       // Create export data matching ProjectData interface
@@ -82,9 +98,32 @@ function App(): JSX.Element {
       // Show success feedback
       alert('Results exported successfully!');
     } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+      logger.error('Export failed', 'app', { error });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Export failed: ${errorMessage}. Please try again.`);
     }
+  };
+
+  // Onboarding handlers
+  const handleOnboardingComplete = (allowAutoInstall: boolean) => {
+    setAutoInstallEnabled(allowAutoInstall);
+    setShowOnboarding(false);
+    
+    // Mark onboarding as completed
+    localStorage.setItem('focule_onboarding_completed', 'true');
+    localStorage.setItem('focule_auto_install_enabled', allowAutoInstall.toString());
+    
+    logger.info('Onboarding completed', 'app', {
+      autoInstall: allowAutoInstall,
+      timestamp: new Date().toISOString()
+    });
+  };
+
+  const handleOnboardingSkip = () => {
+    setShowOnboarding(false);
+    localStorage.setItem('focule_onboarding_completed', 'true');
+    
+    logger.info('Onboarding skipped', 'app');
   };
 
   // Folder opening handled by redesigned component
@@ -128,11 +167,19 @@ function App(): JSX.Element {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen focule-bg">
+      <div className="min-h-screen bg-focule-bg-primary">
         <SuccessCelebration show={showSuccess} message={successMessage} />
-        <GlobalIssueReporter />
+        
+        {/* Onboarding Flow */}
+        {showOnboarding && (
+          <OnboardingFlow 
+            onComplete={handleOnboardingComplete}
+            onSkip={handleOnboardingSkip}
+          />
+        )}
+        
         {/* Skip to main content for screen readers */}
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--focule-primary)] text-white px-4 py-2 rounded">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-focule-primary text-white px-4 py-2 rounded">
           Skip to main content
         </a>
         <main id="main-content" role="main" className="max-w-5xl mx-auto px-6 py-10">
@@ -167,7 +214,7 @@ function App(): JSX.Element {
               onClick={() => {
                 // Show prerequisites check when System button clicked
                 // This would need to be implemented in the redesigned component
-                console.warn('System check requested');
+                logger.warn('System check requested', 'app');
               }}
               className="px-3 py-2 text-sm focule-btn-secondary rounded-lg flex items-center gap-2"
             >
@@ -181,71 +228,80 @@ function App(): JSX.Element {
         </header>
 
         {state.status === 'idle' && (
-          <section aria-label="Video transcription form">
-            <URLInputRedesigned
-              onStart={handleStartTranscription}
-              disabled={false}
-            />
-          </section>
+          <>
+            <URLInputErrorBoundary>
+              <section aria-label="Video transcription form">
+                <URLInputRedesigned
+                  onStart={handleStartTranscription}
+                  disabled={false}
+                />
+              </section>
+            </URLInputErrorBoundary>
+          </>
         )}
 
         {(state.status === 'downloading' ||
           state.status === 'extracting' ||
           state.status === 'transcribing' ||
           state.status === 'processing') && (
-          <section 
-            aria-label="Transcription progress"
-            aria-live="polite"
-            aria-atomic="true"
-            className="focule-card rounded-xl p-8 space-y-6"
-          >
-            <div className="text-center mb-6">
-              <div className="text-5xl mb-4">{getStatusEmoji(state.status)}</div>
-              <h2 className="text-2xl font-bold text-[var(--focule-heading)] mb-2" style={{ letterSpacing: '-0.03em' }}>
-                {getStatusTitle(state.status)}
-              </h2>
-              <p className="text-[var(--focule-text-secondary)]">
-                {getStatusDescription(state.status)}
-              </p>
-            </div>
-            <ProgressBar
-              label={getStatusLabel(state.status)}
-              percent={state.progress}
-              status={state.message}
-              showTips={true}
-            />
-            <div className="text-center pt-4 border-t border-[var(--focule-border)]">
-              <p className="text-xs text-[var(--focule-text-muted)] mb-3">
-                Your files will be saved to your Downloads folder when complete
-              </p>
-              <button
-                onClick={reset}
-                className="px-4 py-2 text-sm text-[var(--focule-text-muted)] hover:text-[var(--focule-text-secondary)] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </section>
+          <TranscriptionErrorBoundary>
+            <section 
+              aria-label="Transcription progress"
+              aria-live="polite"
+              aria-atomic="true"
+              className="focule-card rounded-xl p-8 space-y-6 bg-focule-card-bg border border-focule-border"
+            >
+              <div className="text-center mb-6">
+                <div className="text-5xl mb-4">{getStatusEmoji(state.status)}</div>
+                <h2 className="text-2xl font-bold text-focule-heading mb-2" style={{ letterSpacing: '-0.03em' }}>
+                  {getStatusTitle(state.status)}
+                </h2>
+                <p className="text-focule-text-secondary">
+                  {getStatusDescription(state.status)}
+                </p>
+              </div>
+              <ProgressBar
+                label={getStatusLabel(state.status)}
+                percent={state.progress}
+                status={state.message}
+                showTips={true}
+              />
+              <div className="text-center pt-4 border-t border-focule-border">
+                <p className="text-xs text-focule-text-muted mb-3">
+                  Your files will be saved to your Downloads folder when complete
+                </p>
+                <button
+                  onClick={reset}
+                  className="px-4 py-2 text-sm text-focule-text-muted hover:text-focule-text-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </section>
+          </TranscriptionErrorBoundary>
         )}
 
         {state.status === 'complete' && state.result && (
-          <section 
-            aria-label="Transcription results"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <ResultsViewRedesigned
-              transcript={state.result.transcript}
-              transcriptWithTimestamps={state.result.transcriptWithTimestamps}
-              socialContent={state.result.socialContent}
-              title={state.result.title}
-              whisperModel={state.result.whisperModel}
-              ollamaModel={state.result.ollamaModel}
-              onExport={handleExport}
-              onRunAgain={handleStartOver}
-              onStartOver={handleStartOver}
-            />
-          </section>
+          <TranscriptionErrorBoundary>
+            <section 
+              aria-label="Transcription results"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <ResultsViewRedesigned
+                transcript={state.result.transcript}
+                transcriptWithTimestamps={state.result.transcriptWithTimestamps}
+                socialContent={state.result.socialContent}
+                title={state.result.title}
+                whisperModel={state.result.whisperModel}
+                ollamaModel={state.result.ollamaModel}
+                onExport={handleExport}
+                onRunAgain={handleStartOver}
+                onStartOver={handleStartOver}
+                showMarketing={true}
+              />
+            </section>
+          </TranscriptionErrorBoundary>
         )}
 
         {state.status === 'error' && (
@@ -253,25 +309,25 @@ function App(): JSX.Element {
             aria-label="Error message"
             aria-live="assertive"
             aria-atomic="true"
-            className="focule-card rounded-xl p-6 border-l-4 border-red-500"
           >
-            <h2 className="text-xl font-semibold text-red-400 mb-2" style={{ letterSpacing: '-0.02em' }}>Error</h2>
-            <p className="text-[var(--focule-text-secondary)] mb-4">{state.error || 'An unknown error occurred'}</p>
-            <button
-              onClick={reset}
-              className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
-            >
-              Try Again
-            </button>
+            <ErrorDisplay
+              error={state.error || 'An unknown error occurred'}
+              type="download"
+              onRetry={reset}
+              onDismiss={reset}
+              showDetails={true}
+              sessionId={state.result?.videoPath ? 'current-session' : undefined}
+              operationId="transcription-operation"
+            />
           </section>
         )}
 
-        <footer role="contentinfo" className="mt-16 pt-6 border-t border-[var(--focule-border-subtle)] text-center">
-          <p className="text-xs text-[var(--focule-text-muted)]">
+        <footer role="contentinfo" className="mt-16 pt-6 border-t border-focule-border-subtle text-center">
+          <p className="text-xs text-focule-text-muted">
             Focule v{APP_VERSION} • Transform video into insight
           </p>
-          <p className="text-xs text-[var(--focule-text-muted)] mt-1 opacity-60">
-            <a href="mailto:help@focule.com" className="hover:text-[var(--focule-primary-light)] transition-colors">
+          <p className="text-xs text-focule-text-muted mt-1 opacity-60">
+            <a href="mailto:help@focule.com" className="hover:text-focule-primary-light transition-colors">
               help@focule.com
             </a>
           </p>

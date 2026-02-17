@@ -82,7 +82,7 @@ const PREREQUISITES: Omit<PrerequisiteStatus, 'installed' | 'version' | 'path'>[
     name: 'AI Engine',
     category: 'required',
     downloadUrl: 'https://ollama.ai/download',
-    checkCommand: 'ollama --version',
+    checkCommand: '', // Skip command check, use HTTP API instead
   },
 ];
 
@@ -248,18 +248,24 @@ export async function checkPrerequisites(settingsPath?: string): Promise<Prerequ
       }
       
       case 'AI Engine': {
-        const result = await checkCommand(prereq.checkCommand || '', customPath);
         const running = await checkOllamaRunning();
         const models = running ? await checkOllamaModels() : [];
         
         let note: string | undefined;
-        if (result.installed) {
-          if (!running) note = 'Not running - please start the AI engine';
-          else if (models.length === 0) note = 'No models installed yet';
+        if (running) {
+          if (models.length === 0) note = 'No models installed yet';
           else note = `${models.length} model(s) available`;
+        } else {
+          note = 'Not running - please start the AI engine';
         }
         
-        status = { ...prereq, ...result, customPath, note };
+        status = {
+          ...prereq,
+          installed: running,
+          version: running ? 'Running' : undefined,
+          customPath,
+          note
+        };
         break;
       }
       

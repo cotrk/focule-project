@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { logger } from '../utils/logger';
+import { MarketingContentGenerator } from './MarketingContentGenerator';
 
 /**
  * REDESIGNED RESULTS VIEW
  * 
  * DESIGN IMPROVEMENTS:
- * 1. Three-Tier Hierarchy: Primary (Transcript), Secondary (Social), Tertiary (Technical)
+ * 1. Three-Tier Hierarchy: Primary ( Transcript), Secondary (Social), Tertiary (Technical)
  * 2. Tab Organization: Reduces cognitive overload, user picks what they need
  * 3. Improved Copy UX: Always-visible copy button + toast notification
  * 4. Consolidated Export: Single "Export All" button instead of scattered options
@@ -33,9 +35,10 @@ interface ResultsViewRedesignedProps {
   onExport?: () => void;
   onRunAgain?: () => void;
   onStartOver?: () => void;
+  showMarketing?: boolean;
 }
 
-type TabType = 'transcript' | 'social' | 'technical';
+type TabType = 'transcript' | 'social' | 'technical' | 'marketing';
 
 const Icons = {
   document: (
@@ -84,7 +87,10 @@ function CopyableBlock({ label, content, context }: { label: string; content: st
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      logger.error('Failed to copy:', 'clipboard', {
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
     }
   };
 
@@ -135,7 +141,8 @@ export function ResultsViewRedesigned({
   ollamaModel,
   onExport,
   onRunAgain,
-  onStartOver
+  onStartOver,
+  showMarketing = false
 }: ResultsViewRedesignedProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabType>('social');
   const [showCopiedToast, setShowCopiedToast] = useState(false);
@@ -143,6 +150,7 @@ export function ResultsViewRedesigned({
   const tabs = [
     { id: 'social', label: 'Social Media', icon: Icons.sparkle, count: socialContent ? 4 : 0, disabled: !socialContent },
     { id: 'transcript', label: 'Transcript', icon: Icons.document, count: 1, disabled: false },
+    { id: 'marketing', label: 'TRP8 Marketing', icon: Icons.sparkle, count: showMarketing ? 1 : 0, disabled: !showMarketing },
     { id: 'technical', label: 'Details', icon: Icons.gear, count: 3, disabled: false },
   ] as const;
 
@@ -428,6 +436,20 @@ export function ResultsViewRedesigned({
           </div>
         )}
 
+        {/* TRP8 MARKETING TAB */}
+        {activeTab === 'marketing' && showMarketing && (
+          <MarketingContentGenerator 
+            transcript={transcript}
+            videoTitle={title}
+            onContentGenerated={(content) => {
+              logger.info('Marketing content generated', 'results', {
+                contentCount: content.length,
+                videoTitle: title
+              });
+            }}
+          />
+        )}
+
         {activeTab === 'technical' && (
           <div className="space-y-8">
             {/* AI Model Info */}
@@ -667,7 +689,11 @@ const handleOpenBackupDirectory = async () => {
     
     await window.electronAPI.openFolder(backupPath);
   } catch (error) {
-    console.error('Failed to open backup directory:', error);
+    logger.error('Failed to open backup directory:', 'file-system', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      operation: 'open_folder'
+    });
     alert('Failed to open backup directory');
   }
 };

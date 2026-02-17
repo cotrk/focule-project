@@ -42,3 +42,5 @@ build/
 # Public facing website (separate repo)
 public/
 
+.vercel
+.env*.local

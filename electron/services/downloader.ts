@@ -87,11 +87,42 @@ function loadSessionData(sessionDir: string): SessionData | null {
 }
 
 // ============================================================================
+// URL Preprocessing
+// ============================================================================
+
+function preprocessYouTubeURL(url: string): string {
+  // Handle various YouTube URL formats
+  const youtubePatterns = [
+    // Standard watch URLs
+    /^https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([\w-]+)/,
+    // Shortened URLs
+    /^https?:\/\/(?:www\.)?youtu\.be\/([\w-]+)/,
+    // Embed URLs
+    /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([\w-]+)/,
+    // Shorts
+    /^https?:\/\/(?:www\.)?youtube\.com\/shorts\/([\w-]+)/,
+    // Music URLs
+    /^https?:\/\/(?:www\.)?music\.youtube\.com\/watch\?v=([\w-]+)/,
+  ];
+
+  for (const pattern of youtubePatterns) {
+    const match = url.match(pattern);
+    if (match) {
+      const videoId = match[1];
+      // Always convert to standard watch URL format
+      return `https://www.youtube.com/watch?v=${videoId}`;
+    }
+  }
+
+  return url;
+}
+
+// ============================================================================
 // URL Validation
 // ============================================================================
 
 const URL_PATTERNS = {
-  youtube: /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/,
+  youtube: /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com)\/.+/,
   twitch: /^(https?:\/\/)?(www\.)?twitch\.tv\/(videos\/\d+|[a-zA-Z0-9_]+\/clip\/[a-zA-Z0-9_-]+)/,
 };
 
@@ -290,13 +321,13 @@ function parseYtDlpError(stderr: string, stdout: string): string {
     return 'The yt-dlp version is outdated. Some advanced options may not be available. Using compatible fallback settings.';
   }
   
-  // YouTube-specific errors
+  // YouTube-specific errors with retry suggestions
   if (output.includes('http error 403') || output.includes('forbidden')) {
-    return 'YouTube is blocking the download. This is usually temporary. Try these solutions:\n\n1. Wait 2-3 minutes and try again\n2. Try a different YouTube video\n3. Check if the video is public (not private or age-restricted)\n4. Use Twitch videos as an alternative\n\nYouTube frequently updates their anti-bot measures, causing temporary blocks.';
+    return 'YouTube is blocking the download. This is usually temporary. Try these solutions:\n\n1. Wait 2-3 minutes and try again\n2. Try a different YouTube video\n3. Check if the video is public (not private or age-restricted)\n4. Use Twitch videos as an alternative\n5. Click "Try Again" to automatically retry with different settings\n\nYouTube frequently updates their anti-bot measures, causing temporary blocks.';
   }
   
   if (output.includes('http error 429') || output.includes('too many requests')) {
-    return 'YouTube rate limit detected. Please wait 5-10 minutes before trying again. This happens when too many requests are made in a short time.';
+    return 'YouTube rate limit detected. Please wait 5-10 minutes before trying again. This happens when too many requests are made in a short time.\n\n Tip: Waiting longer between downloads helps avoid this issue.';
   }
   
   if (output.includes('network error') || output.includes('connection') || output.includes('timeout')) {
@@ -338,16 +369,19 @@ export async function downloadVideo(
   url: string,
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<DownloadResult> {
+  // Preprocess URL to normalize format
+  const normalizedUrl = preprocessYouTubeURL(url);
+  
   // Validate URL
-  if (!validateURL(url)) {
+  if (!validateURL(normalizedUrl)) {
     throw new Error('Please enter a valid YouTube or Twitch URL.');
   }
 
-  const platform = getPlatform(url);
-  console.log(`[Downloader] Starting download from ${platform}: ${url}`);
+  const platform = getPlatform(normalizedUrl);
+  console.log(`[Downloader] Starting download from ${platform}: ${normalizedUrl}`);
   
   // Create isolated session for this download
-  const sessionId = createSessionId(url);
+  const sessionId = createSessionId(normalizedUrl);
   const sessionDir = createSessionDirectory(sessionId);
   
   // Register session for cleanup tracking
@@ -356,7 +390,7 @@ export async function downloadVideo(
   // Initialize session data
   const sessionData: SessionData = {
     sessionId,
-    url,
+    url: normalizedUrl,
     createdAt: Date.now(),
   };
   saveSessionData(sessionDir, sessionData);
@@ -375,23 +409,27 @@ export async function downloadVideo(
   console.log(`[Downloader] FFmpeg: ${ffmpegPath}`);
 
   return new Promise((resolve, reject) => {
-    // Build yt-dlp arguments with minimal, compatible options
+    // Build yt-dlp arguments with improved reliability
     const downloadArgs = [
-      url,
-      '-f', 'best[height<=720]/best', // Limit to 720p to avoid restrictions
+      normalizedUrl, // Use preprocessed URL
+      '-f', 'best[height<=720][vcodec^=av01]/best[height<=720]/best', // Prefer AV1 for better compression
       '--merge-output-format', 'mp4',
       '--no-playlist',
       '--write-info-json',
       '--progress',
       '-o', outputTemplate,
-      '--retries', '10',
-      '--fragment-retries', '10',
-      '--extractor-retries', '3',
+      '--retries', '5', // Reduced retries to avoid triggering blocks
+      '--fragment-retries', '5',
+      '--extractor-retries', '2',
+      '--socket-timeout', '30', // Add timeout to prevent hanging
+      '--http-chunk-timeout', '30',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       '--referer', 'https://www.youtube.com/',
       '--add-header', 'Accept-Language:en-US,en;q=0.9',
+      '--add-header', 'DNT: 1', // Add Do Not Track header
       '--ignore-errors',
       '--no-abort-on-error',
+      '--no-check-certificate', // Bypass some SSL issues
       '-4', // Force IPv4
     ];
     

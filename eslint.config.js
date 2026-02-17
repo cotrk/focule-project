@@ -18,7 +18,7 @@ export default [
         ecmaVersion: 2021,
         sourceType: "module",
         ecmaFeatures: { jsx: true },
-        project: ["./tsconfig.json", "./electron/tsconfig.json"],
+        project: ["./tsconfig.json", "./electron/tsconfig.json", "./tsconfig.vite.json"],
       },
       globals: {
         window: "readonly",

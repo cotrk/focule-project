@@ -1,14 +1,20 @@
 {
-  "folders": [
-	{
-		"path": "."
-	},
-	{
-		"path": "../Focule_Dev"
-	},
-	{
-		"path": "../Focule_Public"
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"treeMaker.files.selectedOutputFormat": "markdown",
+		"treeMaker.files.outputFolder": "tree-maker",
+		"treeMaker.files.outputFileName": "structure",
+		"treeMaker.files.outputFilePrefix": "",
+		"treeMaker.files.outputFileSuffix": "",
+		"treeMaker.files.outputFileSeparator": "_",
+		"treeMaker.search.ignoreFilePathPatternOnExport": ["**/dist/**", "**/tree-maker/**"],
+		"treeMaker.search.shouldListOnlyFiles": false,
+		"treeMaker.search.maxSearchRecursionDepth": 0,
+		"treeMaker.search.supportsHiddenFiles": true,
+		"treeMaker.search.keepGitignorePreferences": false
 	}
-],
-  "settings": {}
 }

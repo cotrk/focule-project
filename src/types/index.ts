@@ -53,6 +53,88 @@ export interface TranscriptionProgress {
   total?: string;
 }
 
+// Enhanced result types for better type safety
+export interface DownloadVideoResult {
+  success: boolean;
+  videoPath?: string;
+  title?: string;
+  sessionId?: string;
+  error?: string;
+}
+
+export interface ExtractAudioResult {
+  success: boolean;
+  audioPath?: string;
+  error?: string;
+}
+
+export interface TranscribeAudioResult {
+  success: boolean;
+  transcript?: string;
+  transcriptWithTimestamps?: string;
+  model?: string;
+  error?: string;
+}
+
+export interface OllamaProcessResult {
+  success: boolean;
+  socialContent?: SocialContent;
+  model?: string;
+  error?: string;
+}
+
+// Error handling types
+export interface ErrorContext {
+  operation?: string;
+  sessionId?: string;
+  stackTrace?: string;
+  timestamp?: string;
+  userAgent?: string;
+  [key: string]: unknown;
+}
+
+export interface RecoveryStrategy {
+  type: 'retry' | 'fallback' | 'skip';
+  maxAttempts?: number;
+  delay?: number;
+  fallbackOptions?: string[];
+  userMessage?: string;
+  requiresUserAction?: boolean;
+}
+
+// Performance and memory types
+export interface MemoryInfo {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
+export interface SystemInfo {
+  userAgent: string;
+  platform: string;
+  language: string;
+  cookieEnabled: boolean;
+  onLine: boolean;
+  screenResolution: string;
+  viewport: string;
+  memoryUsage?: string;
+}
+
+// Window extensions for Electron API
+export interface WindowExtensions {
+  electronAPI: import('./electron').ElectronAPI;
+  emailReportData?: {
+    gmail?: string;
+    outlook?: string;
+    mailto?: string;
+  };
+}
+
+// Generic function types for hooks
+export type GenericFunction = (...args: unknown[]) => unknown;
+export type DebouncedFunction<T extends GenericFunction> = T;
+export type ThrottledFunction<T extends GenericFunction> = T;
+
 // Settings types
 export interface Settings {
   outputPath: string;

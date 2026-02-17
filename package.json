@@ -5,11 +5,11 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
-    "dev:vite": "vite",
+    "dev:vite": "vite --port 5173",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
     "build": "npm run build:electron && npm run build:icons && vite build && electron-builder",
     "build:electron": "tsc -p electron/tsconfig.json",
-    "build:icons": "node scripts/generate-icons.js",
+    "build:icons": "node scripts/generate-icons.cjs",
     "preview": "vite preview"
   },
   "keywords": [
@@ -81,8 +81,12 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
+    "lucide-react": "^0.563.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "zod": "^4.3.5"
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "zod": "^4.3.5",
+    "zustand": "^5.0.11"
   }
 }

@@ -5,6 +5,8 @@ import { extractAudio } from './services/ffmpeg';
 import { transcribeAudio } from './services/transcriber';
 import { processWithOllama, getAvailableModels, getStarterRecommendations, getRecommendedFromInstalled, categorizeInstalledModels } from './services/ollama';
 import { checkPrerequisites, setCustomPath } from './services/prerequisites';
+import { ToolManager } from './services/ToolManager';
+// import { LightweightMonitor } from './services/LightweightMonitor'; // Temporarily disabled
 import * as fs from 'fs';
 import * as os from 'os';
 
@@ -21,6 +23,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
+    show: false, // Start minimized - no auto browser popup
   });
 
   if (isDev) {
@@ -43,6 +46,33 @@ ipcMain.handle('download:start', async (_event, url: string) => {
       mainWindow?.webContents.send('download:progress', progress);
     });
     return { success: true, ...result };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('tools:status', async () => {
+  try {
+    const status = await ToolManager.checkToolStatus();
+    return { success: true, status };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('tools:download', async () => {
+  try {
+    await ToolManager.downloadMissingTools();
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('tools:paths', () => {
+  try {
+    const paths = ToolManager.getToolPaths();
+    return { success: true, paths };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -255,9 +285,16 @@ ipcMain.handle('file:save-project', async (_event, projectData: {
 // Open folder in system file explorer
 ipcMain.handle('shell:open-folder', async (_event, folderPath: string) => {
   try {
+    // Ensure folder exists, create if it doesn't
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+    
     await shell.openPath(folderPath);
+    console.log(`[Shell] Opened folder: ${folderPath}`);
     return { success: true };
   } catch (error: any) {
+    console.error(`[Shell] Failed to open folder: ${error.message}`);
     return { success: false, error: error.message };
   }
 });
@@ -272,10 +309,23 @@ ipcMain.handle('file:export-with-dialog', async (_event, projectData: {
   audioPath?: string;
 }) => {
   try {
-    // Show folder selection dialog
+    // Get user's preferred export directory from settings
+    const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+    let exportBasePath = app.getPath('downloads'); // Default fallback
+    
+    if (fs.existsSync(settingsPath)) {
+      try {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        exportBasePath = settings.outputPath || exportBasePath;
+      } catch {
+        // Use default if settings parsing fails
+      }
+    }
+    
+    // Show folder selection dialog with user's preferred directory as default
     const result = await dialog.showOpenDialog(mainWindow!, {
       title: 'Select Export Location',
-      defaultPath: app.getPath('downloads'),
+      defaultPath: exportBasePath,
       properties: ['openDirectory', 'createDirectory'],
     });
 
@@ -321,8 +371,10 @@ ipcMain.handle('file:export-with-dialog', async (_event, projectData: {
       'utf-8'
     );
     
+    console.log(`[Export] Successfully exported to: ${projectFolder}`);
     return { success: true, path: projectFolder };
   } catch (error: any) {
+    console.error(`[Export] Error: ${error.message}`);
     return { success: false, error: error.message };
   }
 });
@@ -393,7 +445,14 @@ ipcMain.handle('prerequisites:browse-path', async (_event, toolName: string) => 
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Auto-setup tools on startup
+  console.log('[Main] 🚀 Starting Focule with smart tool management...');
+  await ToolManager.autoSetup();
+  
+  // Initialize lightweight monitoring
+  // await LightweightMonitor.initialize(); // Temporarily disabled
+  
   createWindow();
 
   app.on('activate', () => {

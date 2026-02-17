@@ -25,9 +25,37 @@
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
       "headers": {
-        "CONTEXT7_API_KEY": "ctx7sk-961cacb6-6b7e-47ad-b871-eb8a2f727fdb"
+        "CONTEXT7_API_KEY": "ctx7sk-5ad6833e-6b22-4b35-9c82-d097fab481e2"
       },
       "enabled": true
+    },
+    "vscode": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-vscode"
+      ]
+    },
+    "openwebui": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-openwebui"
+      ],
+      "env": {
+        "OPENWEBUI_API_KEY": "your-openwebui-api-key",
+        "OPENWEBUI_URL": "http://localhost:3000"
+      }
+    },
+    "gemini": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-gemini"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "your-gemini-api-key"
+      }
     }
   }
 }

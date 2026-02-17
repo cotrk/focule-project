@@ -1,10 +1,12 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
+import type { GenericFunction, DebouncedFunction, ThrottledFunction, MemoryInfo } from '../types';
+import { logger } from './logger';
 
 // Debounce hook for performance optimization
-export function useDebounce<T extends (...args: any[]) => any>(
+export function useDebounce<T extends GenericFunction>(
   callback: T,
   delay: number
-): T {
+): DebouncedFunction<T> {
   const timeoutRef = useRef<NodeJS.Timeout>();
 
   const debouncedCallback = useCallback(
@@ -32,10 +34,10 @@ export function useDebounce<T extends (...args: any[]) => any>(
 }
 
 // Throttle hook for performance optimization
-export function useThrottle<T extends (...args: any[]) => any>(
+export function useThrottle<T extends GenericFunction>(
   callback: T,
   delay: number
-): T {
+): ThrottledFunction<T> {
   const lastRun = useRef(Date.now());
 
   const throttledCallback = useCallback(
@@ -58,7 +60,7 @@ export function useMemo<T>(
 ): T {
   const ref = useRef<{ deps: React.DependencyList; value: T }>();
 
-  if (!ref.current || !deps.every((dep, i) => dep === ref.current.deps[i])) {
+  if (!ref.current || !deps.every((dep, i) => dep === ref.current?.deps?.[i])) {
     ref.current = { deps, value: factory() };
   }
 
@@ -108,7 +110,7 @@ export class PerformanceMonitor {
   static end(label: string): number {
     const startTime = this.timers.get(label);
     if (!startTime) {
-      console.warn(`Timer '${label}' was not started`);
+      logger.warn(`Timer '${label}' was not started`, 'performance');
       return 0;
     }
 
@@ -116,7 +118,11 @@ export class PerformanceMonitor {
     this.timers.delete(label);
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`⏱️ ${label}: ${duration.toFixed(2)}ms`);
+      logger.info(`⏱️ ${label}: ${duration.toFixed(2)}ms`, 'performance', {
+        operation: label,
+        duration,
+        performance: true
+      });
     }
     
     return duration;
@@ -146,7 +152,11 @@ export function useBundleSizeMonitor() {
           if (entry.entryType === 'resource') {
             const resource = entry as PerformanceResourceTiming;
             if (resource.name.includes('.js') || resource.name.includes('.css')) {
-              console.log(`📦 Bundle: ${resource.name.split('/').pop()} - ${(resource.transferSize / 1024).toFixed(2)}KB`);
+              logger.info(`📦 Bundle: ${resource.name.split('/').pop()} - ${(resource.transferSize / 1024).toFixed(2)}KB`, 'performance', {
+        resource: resource.name,
+        size: resource.transferSize,
+        bundle: true
+      });
             }
           }
         }
@@ -164,8 +174,12 @@ export function useMemoryMonitor() {
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && 'memory' in performance) {
       const interval = setInterval(() => {
-        const memory = (performance as any).memory;
-        console.log(`🧠 Memory: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB / ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)}MB`);
+        const memory = (performance as any).memory as MemoryInfo;
+        logger.info(`🧠 Memory: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB / ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)}MB`, 'performance', {
+        used: Math.round(memory.usedJSHeapSize / 1024 / 1024),
+        total: Math.round(memory.totalJSHeapSize / 1024 / 1024),
+        memory: true
+      });
       }, 10000);
 
       return () => clearInterval(interval);
