@@ -38,6 +38,10 @@ function getModelTier(params: number | null): 'lightweight' | 'balanced' | 'perf
   return 'performance';
 }
 
+export function isEmbeddingModelName(modelName: string): boolean {
+  return /embed(?:ding)?/i.test(modelName);
+}
+
 export async function getAvailableModels(): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const req = http.get(`${OLLAMA_BASE_URL}/api/tags`, (res) => {
@@ -60,6 +64,7 @@ export async function getAvailableModels(): Promise<string[]> {
                 typeof model.name === 'string'
               )
               .map(model => model.name)
+              .filter(name => !isEmbeddingModelName(name))
               .sort();
             console.log('[Ollama] Available models:', names);
             resolve(names);
@@ -127,7 +132,7 @@ export function getRecommendedFromInstalled(installedModels: string[]): string[]
   const categorized = categorizeInstalledModels(installedModels);
   const recommended: string[] = [];
   const contentModels = installedModels.filter(model =>
-    !/embed|coder|code-/i.test(model)
+    !isEmbeddingModelName(model) && !/coder|code-/i.test(model)
   );
 
   // Prioritize known good models for content generation
@@ -192,6 +197,10 @@ async function checkOllamaAvailable(): Promise<boolean> {
 }
 
 async function callOllama(prompt: string, model: string): Promise<string> {
+  if (isEmbeddingModelName(model)) {
+    throw new Error(`${model} is an embedding-only model. Choose a text-generation model in Settings.`);
+  }
+
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
       model,

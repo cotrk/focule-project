@@ -1,4 +1,4 @@
-# Focule 1.1.0 for Windows
+# Focule 1.1.1 for Windows
 
 Focule turns videos and audio recordings into transcripts and social content.
 Transcription and AI generation run locally. AI generation uses only Ollama's
@@ -6,7 +6,7 @@ local API at `http://127.0.0.1:11434/api/`; Focule does not use cloud AI APIs.
 
 ## Install and first run
 
-1. Run `Focule-Setup-1.1.0.exe` and follow the installer.
+1. Run `Focule-Setup-1.1.1.exe` and follow the installer.
 2. Install and start Ollama from <https://ollama.com/download>.
 3. In this folder, right-click `Install-QwenModel.ps1` and choose **Run with
    PowerShell**, or open PowerShell here and run:

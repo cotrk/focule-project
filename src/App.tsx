@@ -11,7 +11,7 @@ import { SuccessCelebration } from './components/SuccessCelebration';
 import { GlobalIssueReporter } from './components/GlobalIssueReporter';
 import { useKeyboardShortcuts, commonShortcuts } from './hooks/useKeyboardShortcuts';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 function App(): JSX.Element {
   const { state, startTranscription, reset } = useTranscription();

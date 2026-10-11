@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '1.1.0',
+    [string]$Version = '1.1.1',
     [long]$PartSizeBytes = 1800000000
 )
 

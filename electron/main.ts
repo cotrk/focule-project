@@ -3,7 +3,7 @@ import path from 'path';
 import { downloadVideo } from './services/downloader';
 import { extractAudio } from './services/ffmpeg';
 import { transcribeAudio } from './services/transcriber';
-import { processWithOllama, getAvailableModels, getStarterRecommendations, getRecommendedFromInstalled, categorizeInstalledModels } from './services/ollama';
+import { processWithOllama, getAvailableModels, getStarterRecommendations, getRecommendedFromInstalled, categorizeInstalledModels, isEmbeddingModelName } from './services/ollama';
 import { checkPrerequisites, setCustomPath } from './services/prerequisites';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -117,7 +117,9 @@ ipcMain.handle('settings:get', async () => {
       const data = fs.readFileSync(settingsPath, 'utf-8');
       const settings = JSON.parse(data);
       const legacyModelNames: string[] = ['llama3', 'llama3.1:70b', 'qwen2.5:14b', 'qwen2.5:32b', 'mistral-nemo:12b'];
-      if (legacyModelNames.includes(settings.ollamaModel)) {
+      const needsModelMigration = legacyModelNames.includes(settings.ollamaModel) ||
+        (typeof settings.ollamaModel === 'string' && isEmbeddingModelName(settings.ollamaModel));
+      if (needsModelMigration) {
         const installedModels = await getAvailableModels().catch((): string[] => []);
         const preferredModel = [
           'qwen3.5:4b',
@@ -139,6 +141,13 @@ ipcMain.handle('settings:get', async () => {
 
 ipcMain.handle('settings:set', async (_event, settings: any) => {
   const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+  if (typeof settings?.ollamaModel === 'string' && isEmbeddingModelName(settings.ollamaModel)) {
+    return {
+      success: false,
+      error: 'Embedding-only models cannot generate social content. Choose a text-generation model in Settings.',
+    };
+  }
+
   try {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
     return { success: true };

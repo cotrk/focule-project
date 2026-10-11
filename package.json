@@ -1,6 +1,6 @@
 {
   "name": "focule",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Focule - Turn old content into new social content with local transcription and AI.",
   "main": "dist-electron/main.js",
   "scripts": {
