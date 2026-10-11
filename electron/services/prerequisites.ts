@@ -6,16 +6,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import * as http from 'http';
 import { 
   getFFmpegPaths, 
+  findYtDlp,
   setCustomPath as setPathsCustomPath, 
   getCustomPath as getPathsCustomPath,
   loadCustomPaths 
 } from '../utils/paths';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ============================================================================
 // Types
@@ -156,14 +158,34 @@ async function checkFFmpeg(customPath?: string): Promise<{ installed: boolean; v
   return { installed: false };
 }
 
+async function checkYtDlp(customPath?: string): Promise<{ installed: boolean; version?: string; path?: string }> {
+  const candidate = customPath
+    ? { command: customPath, args: [] as string[] }
+    : findYtDlp();
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      candidate.command,
+      [...candidate.args, '--version'],
+      { timeout: 15000 }
+    );
+    return {
+      installed: true,
+      version: (stdout || stderr).trim().split('\n')[0] || 'Installed',
+      path: candidate.command,
+    };
+  } catch {
+    return { installed: false };
+  }
+}
+
 async function checkPythonModule(moduleName: string): Promise<boolean> {
-  const commands = process.platform === 'win32' 
-    ? [`python -c "import ${moduleName}"`, `py -c "import ${moduleName}"`]
-    : [`python3 -c "import ${moduleName}"`, `python -c "import ${moduleName}"`];
+  const commands = process.platform === 'win32'
+    ? [{ command: 'python', args: ['-c', `import ${moduleName}`] }, { command: 'py', args: ['-3.11', '-c', `import ${moduleName}`] }, { command: 'py', args: ['-c', `import ${moduleName}`] }]
+    : [{ command: 'python3', args: ['-c', `import ${moduleName}`] }, { command: 'python', args: ['-c', `import ${moduleName}`] }];
   
-  for (const cmd of commands) {
+  for (const { command, args } of commands) {
     try {
-      await execAsync(cmd, { timeout: 10000 });
+      await execFileAsync(command, args, { timeout: 10000 });
       return true;
     } catch {
       continue;
@@ -174,8 +196,10 @@ async function checkPythonModule(moduleName: string): Promise<boolean> {
 
 async function checkOllamaRunning(): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get('http://localhost:11434/api/tags', { timeout: 2000 }, (res) => {
-      resolve(res.statusCode === 200);
+    const req = http.get('http://127.0.0.1:11434/api/tags', { timeout: 2000 }, (res) => {
+      const available = res.statusCode === 200;
+      res.resume();
+      resolve(available);
     });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
@@ -183,12 +207,8 @@ async function checkOllamaRunning(): Promise<boolean> {
 }
 
 async function checkOllamaModels(): Promise<string[]> {
-  try {
-    const { getAvailableModels } = await import('./ollama');
-    return await getAvailableModels();
-  } catch {
-    return [];
-  }
+  const { getAvailableModels } = await import('./ollama');
+  return await getAvailableModels();
 }
 
 // ============================================================================
@@ -244,6 +264,12 @@ export async function checkPrerequisites(settingsPath?: string): Promise<Prerequ
           installed,
           version: installed ? 'Ready' : undefined,
         };
+        break;
+      }
+
+      case 'Video Downloader': {
+        const result = await checkYtDlp(customPath);
+        status = { ...prereq, ...result, customPath };
         break;
       }
       

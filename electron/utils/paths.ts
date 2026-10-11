@@ -12,16 +12,29 @@ const userProfile = os.homedir();
 // Custom paths set by user through settings
 let customPaths: Record<string, string> = {};
 
+function normalizeToolName(toolName: string): string {
+  const aliases: Record<string, string> = {
+    ffmpeg: 'Media Processor',
+    FFmpeg: 'Media Processor',
+    'yt-dlp': 'Video Downloader',
+    whisper: 'Voice Recognition',
+    ollama: 'AI Engine',
+  };
+  return aliases[toolName] || toolName;
+}
+
 export function setCustomPath(toolName: string, toolPath: string): void {
-  customPaths[toolName] = toolPath;
+  customPaths[normalizeToolName(toolName)] = toolPath;
 }
 
 export function getCustomPath(toolName: string): string | undefined {
-  return customPaths[toolName];
+  return customPaths[normalizeToolName(toolName)];
 }
 
 export function loadCustomPaths(paths: Record<string, string>): void {
-  customPaths = { ...customPaths, ...paths };
+  for (const [toolName, toolPath] of Object.entries(paths)) {
+    setCustomPath(toolName, toolPath);
+  }
 }
 
 /**
@@ -29,8 +42,11 @@ export function loadCustomPaths(paths: Record<string, string>): void {
  */
 export function getFFmpegPaths(): string[] {
   return [
+    ...(process.resourcesPath
+      ? [path.join(process.resourcesPath, 'focule-assets', 'bin', 'ffmpeg.exe')]
+      : []),
     // Custom path first
-    customPaths['FFmpeg'],
+    customPaths['Media Processor'],
     // User home directory installations
     path.join(userProfile, 'ffmpeg-8.0.1-essentials_build', 'bin', 'ffmpeg.exe'),
     path.join(userProfile, 'ffmpeg-8.0.1', 'bin', 'ffmpeg.exe'),
@@ -86,8 +102,11 @@ export function findFFmpegDir(): string | undefined {
  */
 export function getYtDlpPaths(): string[] {
   return [
+    ...(process.resourcesPath
+      ? [path.join(process.resourcesPath, 'focule-assets', 'bin', 'yt-dlp.exe')]
+      : []),
     // Custom path first
-    customPaths['yt-dlp'],
+    customPaths['Video Downloader'],
     // App bundled
     path.join(process.cwd(), 'assets', 'yt-dlp.exe'),
     path.join(process.cwd(), 'assets', 'yt-dlp'),
@@ -134,4 +153,3 @@ export const MEDIA_EXTENSIONS = [...VIDEO_EXTENSIONS, ...AUDIO_EXTENSIONS];
  * Extensions that indicate a failed download
  */
 export const INVALID_EXTENSIONS = ['.mhtml', '.html', '.htm', '.json', '.part'];
-

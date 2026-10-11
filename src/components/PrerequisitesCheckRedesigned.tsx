@@ -209,11 +209,14 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
     try {
       if (window.electronAPI && window.electronAPI.prerequisites) {
         // Use the proper browsePath method from the complete ElectronAPI
-        const path = await window.electronAPI.prerequisites.browsePath(toolName);
+        const browseResult = await window.electronAPI.prerequisites.browsePath(toolName);
         
-        if (path) {
+        if (browseResult.success && browseResult.path) {
           // Save the path using the proper setPath method
-          await window.electronAPI.prerequisites.setPath(toolName, path);
+          const saveResult = await window.electronAPI.prerequisites.setPath(toolName, browseResult.path);
+          if (!saveResult.success) {
+            throw new Error(saveResult.error || `Could not save the ${humanName} path.`);
+          }
           
           // Show success toast
           showToast(`✓ ${humanName} location saved. Refreshing...`, 'success');
@@ -283,35 +286,15 @@ export function PrerequisitesCheckRedesigned(): JSX.Element {
           }));
           return; // Success, exit early
         }
+        throw new Error(result.error || 'The system prerequisite check returned no status.');
       }
-      
-      // Fallback: If ElectronAPI check fails, use localStorage or default to installed for testing
-      console.log('Using fallback prerequisites check');
-      setPrerequisites((prev: PrerequisiteStatus[]) => prev.map((prereq: PrerequisiteStatus) => {
-        // For now, assume tools are installed if user can transcribe
-        // This is a temporary fix until ElectronAPI is properly working
-        if (prereq.name === 'ffmpeg' || prereq.name === 'yt-dlp' || prereq.name === 'whisper') {
-          return {
-            ...prereq,
-            installed: true,
-            version: 'detected',
-          };
-        }
-        return prereq;
-      }));
+      throw new Error('System checks are available only in the Focule desktop app.');
     } catch (error) {
       console.error('Failed to check prerequisites:', error);
-      // Fallback to assuming critical tools are installed
-      setPrerequisites((prev: PrerequisiteStatus[]) => prev.map((prereq: PrerequisiteStatus) => {
-        if (prereq.severity === 'critical') {
-          return {
-            ...prereq,
-            installed: true,
-            version: 'fallback',
-          };
-        }
-        return prereq;
-      }));
+      showToast(
+        `System check failed: ${error instanceof Error ? error.message : String(error)}`,
+        'error'
+      );
     }
   }, []);
 

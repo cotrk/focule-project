@@ -105,18 +105,18 @@ export async function extractAudio(videoPath: string, sessionId: string): Promis
   return new Promise((resolve, reject) => {
     // FFmpeg arguments for Whisper-optimized audio
     const args = [
-      '-i', `"${videoPath}"`,
+      '-i', videoPath,
       '-vn',              // No video
       '-acodec', 'pcm_s16le',  // PCM 16-bit
       '-ar', '16000',     // 16kHz sample rate (Whisper optimal)
       '-ac', '1',         // Mono
       '-y',               // Overwrite output
-      `"${audioPath}"`,
+      audioPath,
     ];
 
     console.log(`[FFmpeg] Command: ${ffmpegPath} ${args.join(' ')}`);
 
-    const ffmpeg = spawn(ffmpegPath, args, { shell: true });
+    const ffmpeg = spawn(ffmpegPath, args, { windowsHide: true });
 
     let stderr = '';
     let duration = 0;

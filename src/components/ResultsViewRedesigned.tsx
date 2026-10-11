@@ -463,7 +463,7 @@ export function ResultsViewRedesigned({
                   <div className="space-y-1">
                     <div className="flex justify-between">
                       <span className="text-[var(--focule-text-muted)]">Model:</span>
-                      <span className="font-mono text-[var(--focule-text-primary)]">{ollamaModel || 'llama3'}</span>
+                      <span className="font-mono text-[var(--focule-text-primary)]">{ollamaModel || 'qwen3.5:4b'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[var(--focule-text-muted)]">Type:</span>

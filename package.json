@@ -1,13 +1,16 @@
 {
   "name": "focule",
-  "version": "1.0.0",
-  "description": "Focule - Transform video into insight. Desktop app for video transcription using Whisper and Ollama.",
+  "version": "1.1.0",
+  "description": "Focule - Turn old content into new social content with local transcription and AI.",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "npm run build:electron && concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
     "build": "npm run build:electron && npm run build:icons && vite build && electron-builder",
+    "release:win": "npm run build:electron && npm run build:icons && vite build && electron-builder --win nsis",
+    "package:win-release": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging\\scripts\\Assemble-Windows-Release.ps1",
+    "package:github-release": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging\\scripts\\Assemble-GitHub-Release.ps1",
     "build:electron": "tsc -p electron/tsconfig.json",
     "build:icons": "node scripts/generate-icons.js",
     "preview": "vite preview"
@@ -30,6 +33,24 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "packaging/runtime/bin",
+        "to": "focule-assets/bin"
+      },
+      {
+        "from": "packaging/runtime/whisper",
+        "to": "focule-assets/whisper"
+      },
+      {
+        "from": "packaging/licenses",
+        "to": "focule-assets/licenses"
+      },
+      {
+        "from": "LICENSE",
+        "to": "focule-assets/LICENSE"
+      }
     ],
     "win": {
       "target": [
@@ -65,19 +86,19 @@
     "@typescript-eslint/parser": "^8.52.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
-    "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
+    "concurrently": "^9.2.5",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "png-to-ico": "^3.0.1",
-    "postcss": "^8.4.32",
-    "sharp": "^0.34.5",
+    "postcss": "^8.5.23",
+    "sharp": "^0.35.5",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.3",
-    "vite": "^5.0.8",
+    "vite": "^6.4.3",
     "wait-on": "^7.2.0"
   },
   "dependencies": {

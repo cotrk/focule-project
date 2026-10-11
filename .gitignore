@@ -38,7 +38,13 @@ build/
 *.dmg
 *.deb
 *.rpm
+packaging/runtime/bin/*
+!packaging/runtime/bin/.gitkeep
+packaging/runtime/whisper/*
+!packaging/runtime/whisper/.gitkeep
+packaging/runtime/ollama/*
+!packaging/runtime/ollama/.gitkeep
+packaging/runtime/ffmpeg-*
 
 # Public facing website (separate repo)
 public/
-

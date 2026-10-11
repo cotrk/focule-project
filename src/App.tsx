@@ -11,7 +11,7 @@ import { SuccessCelebration } from './components/SuccessCelebration';
 import { GlobalIssueReporter } from './components/GlobalIssueReporter';
 import { useKeyboardShortcuts, commonShortcuts } from './hooks/useKeyboardShortcuts';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 function App(): JSX.Element {
   const { state, startTranscription, reset } = useTranscription();
@@ -77,13 +77,15 @@ function App(): JSX.Element {
       };
 
       // Use exportWithDialog to let user choose location
-      await window.electronAPI.exportWithDialog(exportData);
-      
-      // Show success feedback
-      alert('Results exported successfully!');
+      const result = await window.electronAPI.exportWithDialog(exportData);
+      if (result.canceled) return;
+      if (!result.success) {
+        throw new Error(result.error || 'The export could not be saved.');
+      }
+      alert(`Results exported successfully${result.path ? ` to ${result.path}` : ''}.`);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+      alert(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -158,7 +160,7 @@ function App(): JSX.Element {
               </h1>
             </div>
             <p className="text-[13px] text-[var(--focule-text-muted)] font-nunito border-l border-[var(--focule-border)] pl-4" style={{ letterSpacing: '0.02em' }}>
-              Transform video into insight
+              Turn old content into new social content
             </p>
           </div>
           <nav className="flex items-center gap-2">
@@ -234,6 +236,24 @@ function App(): JSX.Element {
             aria-live="polite"
             aria-atomic="true"
           >
+            <div
+              role="status"
+              className="mb-4 rounded-lg border border-green-500/20 bg-green-500/10 p-4 text-sm text-[var(--focule-text-secondary)]"
+            >
+              <strong className="text-green-400">Done.</strong>{' '}
+              Transcript and timestamps are ready
+              {state.result.socialContent
+                ? ', along with hooks, a description, hashtags, keywords, filenames, and image prompts.'
+                : '.'}
+            </div>
+            {state.warning && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200"
+              >
+                <strong>Social content was not created.</strong> {state.warning}
+              </div>
+            )}
             <ResultsViewRedesigned
               transcript={state.result.transcript}
               transcriptWithTimestamps={state.result.transcriptWithTimestamps}

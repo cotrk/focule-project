@@ -107,22 +107,33 @@ ipcMain.handle('settings:get', async () => {
   const settingsPath = path.join(app.getPath('userData'), 'settings.json');
   // Default to user's Downloads folder for Windows desktop app
   const defaultOutputPath = path.join(app.getPath('downloads'), 'Focule');
+  const defaultSettings = {
+    outputPath: defaultOutputPath,
+    whisperModel: 'base',
+    ollamaModel: 'qwen3.5:4b',
+  };
   try {
     if (fs.existsSync(settingsPath)) {
       const data = fs.readFileSync(settingsPath, 'utf-8');
-      return JSON.parse(data);
+      const settings = JSON.parse(data);
+      const legacyModelNames: string[] = ['llama3', 'llama3.1:70b', 'qwen2.5:14b', 'qwen2.5:32b', 'mistral-nemo:12b'];
+      if (legacyModelNames.includes(settings.ollamaModel)) {
+        const installedModels = await getAvailableModels().catch((): string[] => []);
+        const preferredModel = [
+          'qwen3.5:4b',
+          'qwen3.5:9b',
+          'ministral-3:8b',
+          'gemma4:e4b-it-qat',
+        ].find(model => installedModels.includes(model));
+        settings.ollamaModel = preferredModel || getRecommendedFromInstalled(installedModels)[0] || defaultSettings.ollamaModel;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      }
+      return { ...defaultSettings, ...settings };
     }
-    return {
-      outputPath: defaultOutputPath,
-      whisperModel: 'base',
-      ollamaModel: 'llama3',
-    };
+    return defaultSettings;
   } catch (error) {
-    return {
-      outputPath: defaultOutputPath,
-      whisperModel: 'base',
-      ollamaModel: 'llama3',
-    };
+    console.error('[Settings] Could not load settings:', error);
+    return defaultSettings;
   }
 });
 
@@ -331,7 +342,26 @@ ipcMain.handle('prerequisites:check', async () => {
   try {
     const settingsPath = path.join(app.getPath('userData'), 'settings.json');
     const result = await checkPrerequisites(settingsPath);
-    return { success: true, ...result };
+    const find = (name: string) => result.prerequisites.find(prerequisite => prerequisite.name === name);
+    const ffmpeg = find('Media Processor');
+    const ytDlp = find('Video Downloader');
+    const whisper = find('Voice Recognition');
+    const ollama = find('AI Engine');
+    const tools = {
+      ffmpeg: { name: 'FFmpeg', installed: ffmpeg?.installed ?? false, version: ffmpeg?.version, path: ffmpeg?.path },
+      'yt-dlp': { name: 'yt-dlp', installed: ytDlp?.installed ?? false, version: ytDlp?.version, path: ytDlp?.path },
+      whisper: { name: 'Whisper', installed: whisper?.installed ?? false, version: whisper?.version, path: whisper?.path },
+      ollama: {
+        name: 'Ollama',
+        installed: Boolean(ollama?.installed && ollama.note?.endsWith('model(s) available')),
+        version: ollama?.version,
+        path: ollama?.path,
+      },
+    };
+    const missing = Object.entries(tools)
+      .filter(([, status]) => !status.installed)
+      .map(([name]) => name);
+    return { success: true, ...result, tools, missing };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -361,13 +391,16 @@ ipcMain.handle('prerequisites:set-path', async (_event, toolName: string, toolPa
 
 ipcMain.handle('prerequisites:browse-path', async (_event, toolName: string) => {
   try {
+    const isDirectory = toolName === 'export-directory';
     const result = await dialog.showOpenDialog(mainWindow!, {
-      title: `Select ${toolName} executable`,
-      filters: [
-        { name: 'Executable', extensions: process.platform === 'win32' ? ['exe'] : [''] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-      properties: ['openFile'],
+      title: isDirectory ? 'Select export directory' : `Select ${toolName} executable`,
+      ...(isDirectory ? {} : {
+        filters: [
+          { name: 'Executable', extensions: process.platform === 'win32' ? ['exe'] : [''] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      }),
+      properties: isDirectory ? ['openDirectory', 'createDirectory'] : ['openFile'],
     });
 
     if (!result.canceled && result.filePaths.length > 0) {
@@ -410,4 +443,3 @@ app.on('window-all-closed', () => {
 });
 
 export { getMainWindow };
-

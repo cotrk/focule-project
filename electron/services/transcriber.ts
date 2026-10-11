@@ -2,14 +2,14 @@
  * Whisper transcription service
  */
 
-import { exec } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
-import { promisify } from 'util';
 import { findFFmpegDir } from '../utils/paths';
+import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface TranscriptionProgress {
   percent: number;
@@ -27,24 +27,36 @@ export interface TranscriptionResult {
 // ============================================================================
 
 async function findWorkingPython(): Promise<string> {
-  const pythonCommands = ['python', 'python3', 'py'];
+  const pythonCommands = process.platform === 'win32'
+    ? [
+      { command: 'python', args: [] },
+      { command: 'py', args: ['-3.11'] },
+      { command: 'py', args: [] },
+    ]
+    : [
+      { command: 'python3', args: [] },
+      { command: 'python', args: [] },
+    ];
 
-  for (const cmd of pythonCommands) {
+  for (const { command, args } of pythonCommands) {
     try {
-      await execAsync(`${cmd} --version`, { timeout: 5000 });
-      console.log(`[Transcriber] Found Python: ${cmd}`);
-      return cmd;
+      await execFileAsync(command, [...args, '--version'], { timeout: 5000 });
+      const pythonPath = args.length ? `${command} ${args.join(' ')}` : command;
+      if (await checkWhisperInstalled(command, args)) {
+        console.log(`[Transcriber] Found Python with Whisper: ${pythonPath}`);
+        return pythonPath;
+      }
     } catch {
       continue;
     }
   }
 
-  return 'python';
+  throw new Error('Python with OpenAI Whisper was not found. Install Python 3.11 and run the included setup script.');
 }
 
-async function checkWhisperInstalled(pythonPath: string): Promise<boolean> {
+async function checkWhisperInstalled(pythonPath: string, pythonArgs: string[]): Promise<boolean> {
   try {
-    await execAsync(`${pythonPath} -c "import whisper"`, { timeout: 15000 });
+    await execFileAsync(pythonPath, [...pythonArgs, '-c', 'import whisper'], { timeout: 15000 });
     console.log('[Transcriber] Whisper is installed');
     return true;
   } catch {
@@ -63,6 +75,23 @@ function createWhisperScript(): string {
   const script = `import whisper
 import sys
 import json
+import array
+import wave
+import re
+
+def clipping_ratio(audio_path):
+    total = 0
+    clipped = 0
+    with wave.open(audio_path, 'rb') as audio:
+        while True:
+            chunk = audio.readframes(16000)
+            if not chunk:
+                break
+            samples = array.array('h')
+            samples.frombytes(chunk)
+            total += len(samples)
+            clipped += sum(1 for sample in samples if abs(sample) >= 32760)
+    return clipped / total if total else 0
 
 def transcribe_audio(audio_path, model_name='base'):
     try:
@@ -74,6 +103,7 @@ def transcribe_audio(audio_path, model_name='base'):
         print(json.dumps({"status": "transcribing", "percent": 10}))
         sys.stdout.flush()
         
+        clipped_ratio = clipping_ratio(audio_path)
         result = model.transcribe(audio_path, verbose=False)
         
         # Generate transcript with timestamps
@@ -87,6 +117,26 @@ def transcribe_audio(audio_path, model_name='base'):
             
             transcript_with_timestamps.append(f"[{start_time} -> {end_time}] {text}")
             plain_transcript.append(text)
+
+        transcript = " ".join(plain_transcript).strip()
+        segments = result['segments']
+        if not transcript:
+            raise RuntimeError("No speech was detected. The audio may be silent or too quiet.")
+
+        compact = re.sub(r'[^a-zA-Z0-9]', '', transcript)
+        largest_char_ratio = max((compact.lower().count(char) / len(compact) for char in set(compact.lower())), default=0)
+        repeated_segment_count = max((plain_transcript.count(text) for text in set(plain_transcript)), default=0)
+        low_confidence = segments and all(
+            segment.get('no_speech_prob', 0) > 0.85 and segment.get('avg_logprob', 0) < -1.0
+            for segment in segments
+        )
+        garbled = (len(compact) > 80 and largest_char_ratio > 0.4) or repeated_segment_count >= 5
+        if low_confidence or garbled:
+            if clipped_ratio >= 0.02:
+                reason = "Audio is heavily clipped and Whisper could not recognize reliable speech. Reduce recording levels and try again."
+            else:
+                reason = "Whisper could not recognize reliable speech. The audio may be silent, noisy, or unintelligible."
+            raise RuntimeError(reason)
         
         # Save SRT file
         srt_path = audio_path.replace('.wav', '.srt').replace('.mp3', '.srt')
@@ -100,7 +150,7 @@ def transcribe_audio(audio_path, model_name='base'):
         print(json.dumps({
             "status": "complete",
             "percent": 100,
-            "transcript": " ".join(plain_transcript),
+            "transcript": transcript,
             "transcript_with_timestamps": "\\n".join(transcript_with_timestamps),
             "srt_path": srt_path
         }))
@@ -152,21 +202,19 @@ export async function transcribeAudio(
     throw new Error('Audio file not found. Please try processing the video again.');
   }
 
-  // Find Python
+  // Find a Python interpreter that can import Whisper.
   const pythonPath = await findWorkingPython();
   console.log(`[Transcriber] Using Python: ${pythonPath}`);
-  
-  // Check Whisper
-  const whisperInstalled = await checkWhisperInstalled(pythonPath);
-  if (!whisperInstalled) {
-    throw new Error('Whisper is not installed. Please run: pip install openai-whisper');
-  }
 
   // Create transcription script
   const scriptPath = createWhisperScript();
+  const bundledBaseModel = path.join(process.resourcesPath, 'focule-assets', 'whisper', 'base.pt');
+  const modelToLoad = model === 'base' && fs.existsSync(bundledBaseModel)
+    ? bundledBaseModel
+    : model;
   console.log(`[Transcriber] Script: ${scriptPath}`);
   console.log(`[Transcriber] Audio: ${audioPath}`);
-  console.log(`[Transcriber] Model: ${model}`);
+  console.log(`[Transcriber] Model: ${modelToLoad}`);
 
   // Setup environment with FFmpeg in PATH (Whisper uses it internally)
   const env: NodeJS.ProcessEnv = { ...process.env };
@@ -177,58 +225,77 @@ export async function transcribeAudio(
   }
 
   return new Promise((resolve, reject) => {
-    const command = `"${pythonPath}" "${scriptPath}" "${audioPath}" ${model}`;
-    console.log(`[Transcriber] Running: ${command}`);
-    
-    exec(command, { 
+    const [pythonCommand, ...pythonArgs] = pythonPath.split(' ');
+    const child = spawn(pythonCommand, [...pythonArgs, scriptPath, audioPath, modelToLoad], {
       env,
-      timeout: 7200000, // 2 hours for large models on CPU
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-    }, (error, stdout, stderr) => {
-      if (stderr) console.log(`[Transcriber] stderr: ${stderr}`);
-      
-      if (error) {
-        reject(new Error('Transcription failed. Please try a smaller quality setting or shorter video.'));
+      windowsHide: true,
+    });
+    let stdoutBuffer = '';
+    let stderr = '';
+    let result: TranscriptionResult | undefined;
+    let scriptError: string | undefined;
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('Transcription timed out after two hours. Try a smaller Whisper model or a shorter recording.'));
+    }, 7200000);
+
+    const handleLine = (line: string): void => {
+      if (!line.trim()) return;
+      try {
+        const message = JSON.parse(line);
+        if (onProgress && message.percent !== undefined) {
+          onProgress({
+            percent: message.percent,
+            status: message.status || 'processing',
+          });
+        }
+        if (message.status === 'complete') {
+          result = {
+            transcript: message.transcript || '',
+            transcriptWithTimestamps: message.transcript_with_timestamps || '',
+            srtPath: message.srt_path,
+          };
+        } else if (message.status === 'error') {
+          scriptError = message.error || 'Whisper could not transcribe this audio.';
+        }
+      } catch {
+        console.debug('[Transcriber] Ignoring non-JSON output from Whisper.');
+      }
+    };
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdoutBuffer += chunk;
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() || '';
+      lines.forEach(handleLine);
+    });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(new Error(`Could not start Python for transcription: ${error.message}`));
+    });
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      if (stdoutBuffer.trim()) handleLine(stdoutBuffer);
+      if (code !== 0) {
+        console.error('[Transcriber] Whisper process failed:', stderr);
+        reject(new Error(scriptError || 'Transcription failed. Check that Python, Whisper, and FFmpeg are installed.'));
         return;
       }
-
-      // Parse output for results
-      const lines = stdout.split('\n').filter(line => line.trim());
-      
-      for (const line of lines) {
-        try {
-          const result = JSON.parse(line);
-          
-          // Send progress updates
-          if (onProgress && result.percent !== undefined) {
-            onProgress({
-              percent: result.percent,
-              status: result.status || 'processing',
-            });
-          }
-          
-          // Return completed result
-          if (result.status === 'complete') {
-            console.log('[Transcriber] Complete!');
-            resolve({
-              transcript: result.transcript || '',
-              transcriptWithTimestamps: result.transcript_with_timestamps || '',
-              srtPath: result.srt_path,
-            });
-            return;
-          }
-          
-          // Handle errors
-          if (result.status === 'error') {
-            reject(new Error(result.error || 'Transcription failed. Please try again.'));
-            return;
-          }
-        } catch {
-          // Not JSON, ignore
-        }
+      if (scriptError) {
+        reject(new Error(scriptError));
+        return;
       }
-      
-      reject(new Error('Transcription completed but no result was returned. Please try again.'));
+      if (!result?.transcript.trim()) {
+        reject(new Error('Transcription finished without recognizing any speech. The audio may be silent or unclear.'));
+        return;
+      }
+      console.log('[Transcriber] Complete!');
+      resolve(result);
     });
   });
 }

@@ -34,7 +34,7 @@ export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings>({
     outputPath: '',
     whisperModel: 'base',
-    ollamaModel: 'llama3',
+    ollamaModel: 'qwen3.5:4b',
   });
   const [isOpen, setIsOpen] = useState(false);
   const [localModels, setLocalModels] = useState<string[]>([]);
@@ -46,6 +46,7 @@ export function SettingsPanel() {
   const [recommendedFromInstalled, setRecommendedFromInstalled] = useState<string[]>([]);
   const [starterRecommendations, setStarterRecommendations] = useState<StarterModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(true);
+  const [modelError, setModelError] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -61,7 +62,7 @@ export function SettingsPanel() {
     setSettings({
       outputPath: loaded.outputPath || '',
       whisperModel: loaded.whisperModel || 'base',
-      ollamaModel: loaded.ollamaModel || 'llama3',
+      ollamaModel: loaded.ollamaModel || 'qwen3.5:4b',
     });
   };
 
@@ -69,9 +70,7 @@ export function SettingsPanel() {
     if (!window.electronAPI) {
       setLoadingModels(false);
       setStarterRecommendations([
-        { name: 'llama3.2:3b', tier: 'lightweight', paramRange: 'Under 8B', vram: '4-6 GB', description: 'Fast and efficient. Great for quick processing.', url: 'https://ollama.com/library/llama3.2' },
-        { name: 'mistral-nemo:12b', tier: 'balanced', paramRange: '8B - 20B', vram: '8-16 GB', description: 'Best balance of quality and speed.', url: 'https://ollama.com/library/mistral-nemo' },
-        { name: 'qwen2.5:32b', tier: 'performance', paramRange: '20B+', vram: '24-32 GB', description: 'Professional-grade results.', url: 'https://ollama.com/library/qwen2.5:32b' },
+        { name: 'qwen3.5:4b', tier: 'lightweight', paramRange: '4B', vram: '4-6 GB', description: 'Compact local model with strong multilingual support. Apache-2.0 license.', url: 'https://ollama.com/library/qwen3.5' },
       ]);
       return;
     }
@@ -80,13 +79,17 @@ export function SettingsPanel() {
     try {
       const result = await window.electronAPI.getOllamaModels();
       if (result.success) {
+        setModelError(null);
         setLocalModels(result.localModels || []);
         setCategorized(result.categorized || { lightweight: [], balanced: [], performance: [] });
         setRecommendedFromInstalled(result.recommendedFromInstalled || []);
         setStarterRecommendations(result.starterRecommendations || []);
+      } else {
+        setModelError(result.error || 'Cannot reach the local Ollama service at 127.0.0.1:11434.');
       }
     } catch (error) {
       console.error('Failed to load Ollama models:', error);
+      setModelError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoadingModels(false);
     }
@@ -101,12 +104,18 @@ export function SettingsPanel() {
   // Handler for saving settings
   const handleSave = async () => {
     try {
-      await window.electronAPI?.setSettings(settings);
+      if (!window.electronAPI) {
+        throw new Error('Settings are only available in the desktop application.');
+      }
+      const result = await window.electronAPI.setSettings(settings);
+      if (!result.success) {
+        throw new Error(result.error || 'Settings could not be saved.');
+      }
       alert('✅ Settings saved successfully!');
       setIsOpen(false); // Close settings panel after successful save
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert('❌ Failed to save settings. Please try again.\n\nPossible causes:\n- File permission issues\n- Invalid export directory path\n- Network connection issues\n\nSolution: Check your export directory path and try again.');
+      alert(`❌ Failed to save settings: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -125,32 +134,34 @@ export function SettingsPanel() {
     }
 
     try {
-      const path = await window.electronAPI.prerequisites.browsePath('export-directory');
-      if (path) {
-        handleChange('outputPath', path);
+      const result = await window.electronAPI.prerequisites.browsePath('export-directory');
+      if (result.success && result.path) {
+        handleChange('outputPath', result.path);
+      } else if (!result.canceled) {
+        throw new Error(result.error || 'No export directory was selected.');
       }
     } catch (error) {
       console.error('Failed to browse directory:', error);
-      alert('Failed to browse directory');
+      alert(`Failed to browse directory: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
   // Handler for opening backup directory
   const handleOpenBackupDirectory = async () => {
-    const backupPath = settings.outputPath || 
-      (await window.electronAPI?.getSettings())?.outputPath || 
-      require('os').homedir() + '/Downloads/Focule-Backups';
-
     if (!window.electronAPI?.openFolder) {
       alert('Cannot open folder: ElectronAPI not available');
       return;
     }
 
     try {
+      const backupPath = settings.outputPath || (await window.electronAPI.getSettings()).outputPath;
+      if (!backupPath) {
+        throw new Error('Choose an export directory in Settings first.');
+      }
       await window.electronAPI.openFolder(backupPath);
     } catch (error) {
       console.error('Failed to open backup directory:', error);
-      alert('Failed to open backup directory');
+      alert(`Failed to open backup directory: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -311,6 +322,15 @@ export function SettingsPanel() {
                         </div>
                       </div>
                     </>
+                  ) : modelError ? (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200"
+                    >
+                      <p className="font-medium">Could not load local Ollama models.</p>
+                      <p className="mt-1 text-xs">{modelError}</p>
+                      <p className="mt-2 text-xs">Start Ollama and confirm its local API is available at 127.0.0.1:11434, then refresh models.</p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20">
@@ -358,7 +378,9 @@ export function SettingsPanel() {
                                     {model.description}
                                   </p>
                                   <code className="block mt-2 text-xs bg-[var(--focule-bg-primary)] text-[var(--focule-text-secondary)] px-2 py-1 rounded">
-                                    ollama pull {model.name}
+                                    {model.name === 'qwen3.5:4b'
+                                      ? 'Run .\\Install-QwenModel.ps1 from the release folder'
+                                      : `ollama pull ${model.name}`}
                                   </code>
                                 </div>
                               ))}

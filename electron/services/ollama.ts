@@ -1,6 +1,4 @@
 import * as http from 'http';
-import * as path from 'path';
-import * as os from 'os';
 
 export interface SocialContent {
   hooks: string[];  // Now supports multiple hook/title options
@@ -24,8 +22,7 @@ export interface RecommendedModel {
   url: string;
 }
 
-const OLLAMA_BASE_URL = 'http://localhost:11434';
-const OLLAMA_MODELS_PATH = path.join(os.homedir(), '.ollama', 'models', 'manifests', 'registry.ollama.ai', 'library');
+const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 
 // Extract parameter count from model name (e.g., "mistral-nemo:12b" -> 12)
 function getModelParams(modelName: string): number | null {
@@ -42,30 +39,43 @@ function getModelTier(params: number | null): 'lightweight' | 'balanced' | 'perf
 }
 
 export async function getAvailableModels(): Promise<string[]> {
-  return new Promise((resolve) => {
-    const req = http.get('http://127.0.0.1:11434/api/tags', (res) => {
+  return new Promise((resolve, reject) => {
+    const req = http.get(`${OLLAMA_BASE_URL}/api/tags`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
-          const response = JSON.parse(data);
-          if (response.models && Array.isArray(response.models)) {
-            const names = response.models.map((m: any) => m.name).sort();
+          const response: unknown = JSON.parse(data);
+          if (
+            typeof response === 'object' &&
+            response !== null &&
+            'models' in response &&
+            Array.isArray(response.models)
+          ) {
+            const names = response.models
+              .filter((model): model is { name: string } =>
+                typeof model === 'object' &&
+                model !== null &&
+                'name' in model &&
+                typeof model.name === 'string'
+              )
+              .map(model => model.name)
+              .sort();
             console.log('[Ollama] Available models:', names);
             resolve(names);
           } else {
-            resolve([]);
+            reject(new Error('Ollama returned an invalid model list.'));
           }
-        } catch {
-          resolve([]);
+        } catch (error) {
+          reject(new Error(`Could not read Ollama's local model list: ${String(error)}`));
         }
       });
     });
     
-    req.on('error', () => resolve([]));
+    req.on('error', () => reject(new Error('Cannot connect to Ollama at 127.0.0.1:11434. Start Ollama and try again.')));
     req.setTimeout(5000, () => {
       req.destroy();
-      resolve([]);
+      reject(new Error('Ollama did not respond within 5 seconds.'));
     });
   });
 }
@@ -102,44 +112,12 @@ export function categorizeInstalledModels(installedModels: string[]): {
 export function getStarterRecommendations(): RecommendedModel[] {
   return [
     {
-      name: 'llama3.2:3b',
+      name: 'qwen3.5:4b',
       tier: 'lightweight',
-      paramRange: 'Under 8B',
+      paramRange: '4B',
       vram: '4-6 GB',
-      description: 'Fast and efficient. Great for quick processing on most systems. Perfect for laptops and older GPUs.',
-      url: 'https://ollama.com/library/llama3.2',
-    },
-    {
-      name: 'mistral-nemo:12b',
-      tier: 'balanced',
-      paramRange: '8B - 20B',
-      vram: '8-16 GB',
-      description: 'Best balance of quality and speed. Recommended for most users with dedicated GPUs like RTX 3060/4060.',
-      url: 'https://ollama.com/library/mistral-nemo',
-    },
-    {
-      name: 'qwen2.5:14b',
-      tier: 'balanced',
-      paramRange: '8B - 20B',
-      vram: '12-16 GB',
-      description: 'Excellent for content generation. Great multilingual support. Works well on RTX 3070/4070 or better.',
-      url: 'https://ollama.com/library/qwen2.5',
-    },
-    {
-      name: 'llama3.1:70b',
-      tier: 'performance',
-      paramRange: '20B+',
-      vram: '48+ GB',
-      description: 'Maximum quality output. Requires high-end hardware like RTX 4090, 5090, or multiple GPUs.',
-      url: 'https://ollama.com/library/llama3.1:70b',
-    },
-    {
-      name: 'qwen2.5:32b',
-      tier: 'performance',
-      paramRange: '20B+',
-      vram: '24-32 GB',
-      description: 'Professional-grade results. For RTX 4080/4090 or workstation GPUs with 24GB+ VRAM.',
-      url: 'https://ollama.com/library/qwen2.5:32b',
+      description: 'Packaged Focule model. Local inference, Apache-2.0 licensed, and suitable for most desktop GPUs.',
+      url: 'https://ollama.com/library/qwen3.5',
     },
   ];
 }
@@ -148,18 +126,23 @@ export function getStarterRecommendations(): RecommendedModel[] {
 export function getRecommendedFromInstalled(installedModels: string[]): string[] {
   const categorized = categorizeInstalledModels(installedModels);
   const recommended: string[] = [];
+  const contentModels = installedModels.filter(model =>
+    !/embed|coder|code-/i.test(model)
+  );
 
   // Prioritize known good models for content generation
-  const priorityPatterns = ['mistral', 'llama', 'qwen', 'gemma', 'phi'];
+  const priorityPatterns = ['qwen3.5', 'qwen', 'mistral', 'gemma', 'llama', 'phi'];
   
   const findBest = (models: string[]): string | null => {
     // First try to find a priority model
     for (const pattern of priorityPatterns) {
-      const match = models.find(m => m.toLowerCase().includes(pattern));
+      const match = models.find(m =>
+        contentModels.includes(m) && m.toLowerCase().includes(pattern)
+      );
       if (match) return match;
     }
     // Otherwise return first available
-    return models[0] || null;
+    return models.find(model => contentModels.includes(model)) || null;
   };
 
   // Get one from each tier if available
@@ -173,7 +156,7 @@ export function getRecommendedFromInstalled(installedModels: string[]): string[]
 
   // If we still need more, just add any remaining
   if (recommended.length < 2) {
-    for (const model of installedModels) {
+    for (const model of contentModels) {
       if (!recommended.includes(model) && recommended.length < 3) {
         recommended.push(model);
       }
@@ -184,44 +167,41 @@ export function getRecommendedFromInstalled(installedModels: string[]): string[]
 }
 
 async function checkOllamaAvailable(): Promise<boolean> {
-  const urls = [
-    'http://127.0.0.1:11434/api/tags',
-    'http://localhost:11434/api/tags',
-  ];
+  const url = `${OLLAMA_BASE_URL}/api/tags`;
+  console.log('[Ollama] Checking availability at', url);
 
-  for (const url of urls) {
-    console.log('[Ollama] Checking availability at', url);
-    
-    const available = await new Promise<boolean>((resolve) => {
-      const req = http.get(url, (res) => {
-        console.log('[Ollama] Response status:', res.statusCode);
-        resolve(res.statusCode === 200);
-      });
-
-      req.on('error', (err) => {
-        console.log('[Ollama] Connection error:', err.message);
-        resolve(false);
-      });
-
-      req.setTimeout(5000, () => {
-        console.log('[Ollama] Connection timeout');
-        req.destroy();
-        resolve(false);
-      });
+  return new Promise<boolean>((resolve) => {
+    const req = http.get(url, (res) => {
+      console.log('[Ollama] Response status:', res.statusCode);
+      const available = res.statusCode === 200;
+      res.resume();
+      resolve(available);
     });
 
-    if (available) return true;
-  }
+    req.on('error', (err) => {
+      console.log('[Ollama] Connection error:', err.message);
+      resolve(false);
+    });
 
-  return false;
+    req.setTimeout(5000, () => {
+      console.log('[Ollama] Connection timeout');
+      req.destroy();
+      resolve(false);
+    });
+  });
 }
 
-async function callOllama(prompt: string, model: string = 'llama3'): Promise<string> {
+async function callOllama(prompt: string, model: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
       model,
       prompt,
       stream: false,
+      think: false,
+      options: {
+        num_ctx: 16384,
+        num_predict: 2048,
+      },
     });
 
     console.log(`[Ollama] Calling model: ${model}`);
@@ -396,8 +376,16 @@ function parseSocialContent(response: string): SocialContent {
 
 export async function processWithOllama(
   transcript: string,
-  model: string = 'llama3'
+  model: string = 'qwen3.5:4b'
 ): Promise<OllamaResult> {
+  const normalizedTranscript = transcript.trim();
+  if (!normalizedTranscript) {
+    throw new Error('No speech was transcribed. The audio may be silent or too unclear to recognize.');
+  }
+  if (normalizedTranscript.length > 28000) {
+    throw new Error('This transcript is too long for reliable local content generation. Try a shorter video or split the audio into sections.');
+  }
+
   const available = await checkOllamaAvailable();
   if (!available) {
     throw new Error('AI engine is not running. Please start Ollama and try again.');
@@ -444,7 +432,7 @@ IMAGE PROMPTS FOR GOOGLE IMAGEFX:
 3. [Third prompt with different angle or style]
 
 Transcript:
-${transcript.substring(0, 6000)}${transcript.length > 6000 ? '...' : ''}
+${normalizedTranscript}
 
 Generate the social media content now:`;
 
@@ -454,24 +442,15 @@ Generate the social media content now:`;
     console.log(`[Ollama] Got response, parsing social content`);
     const socialContent = parseSocialContent(response);
     
-    // Ensure we have reasonable defaults
-    if (socialContent.hooks.length === 0) {
-      socialContent.hooks = ['Check out this amazing video content!'];
-    }
-    if (!socialContent.description) {
-      socialContent.description = 'Watch the full video for more insights.';
-    }
-    if (socialContent.hashtags.length === 0) {
-      socialContent.hashtags = ['#content', '#video', '#viral'];
-    }
-    if (socialContent.keywords.length === 0) {
-      socialContent.keywords = ['video', 'content', 'watch'];
-    }
-    if (socialContent.filenames.length === 0) {
-      socialContent.filenames = ['video_content.mp4'];
-    }
-    if (socialContent.imagePrompts.length === 0) {
-      socialContent.imagePrompts = ['A vibrant, eye-catching thumbnail with bold text overlay'];
+    if (
+      socialContent.hooks.length === 0 ||
+      !socialContent.description ||
+      socialContent.hashtags.length === 0 ||
+      socialContent.keywords.length === 0 ||
+      socialContent.filenames.length === 0 ||
+      socialContent.imagePrompts.length === 0
+    ) {
+      throw new Error('The local model returned incomplete content. Try again or choose a different Ollama model.');
     }
 
     return { socialContent };

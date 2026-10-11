@@ -82,6 +82,8 @@ export interface OllamaModel {
 export interface FileSaveResult {
   success: boolean;
   filePath?: string;
+  path?: string;
+  canceled?: boolean;
   error?: string;
 }
 

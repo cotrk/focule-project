@@ -24,6 +24,7 @@ interface TranscriptionState {
     whisperModel?: string;
   };
   error?: string;
+  warning?: string;
 }
 
 export function useTranscription() {
@@ -116,6 +117,7 @@ export function useTranscription() {
 
       // Process with Ollama for social media content (optional)
       let socialContent: SocialContent | undefined;
+      let contentWarning: string | undefined;
       
       try {
         const ollamaResult = await window.electronAPI.processWithOllama(
@@ -124,15 +126,19 @@ export function useTranscription() {
         );
         if (ollamaResult.success && ollamaResult.socialContent) {
           socialContent = ollamaResult.socialContent;
+        } else {
+          throw new Error(ollamaResult.error || 'The local model did not return social media content.');
         }
-      } catch (ollamaError: any) {
-        console.warn('Ollama processing failed, continuing without social content:', ollamaError);
+      } catch (ollamaError) {
+        contentWarning = ollamaError instanceof Error ? ollamaError.message : String(ollamaError);
+        console.warn('Ollama processing failed, continuing with the transcript only:', contentWarning);
       }
 
       setState({
         status: 'complete',
         progress: 100,
-        message: '🎉 Complete!',
+        message: 'Complete',
+        warning: contentWarning,
         result: {
           transcript: transcribeResult.transcript,
           transcriptWithTimestamps: transcribeResult.transcriptWithTimestamps,
@@ -174,4 +180,3 @@ export function useTranscription() {
     reset,
   };
 }
-
