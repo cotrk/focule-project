@@ -9,6 +9,7 @@ $repoRoot = Split-Path -Parent $packagingRoot
 $releaseRoot = Join-Path $repoRoot 'release'
 $bundleRoot = Join-Path $releaseRoot "Focule-$Version-Windows-x64"
 $assetsRoot = Join-Path $releaseRoot "Focule-$Version-GitHub-Assets"
+$supportArchive = Join-Path $assetsRoot "Focule-$Version-Release-Tools.zip"
 $modelPath = Join-Path $bundleRoot 'runtime\ollama\qwen3.5-4b.gguf'
 $installerPath = Join-Path $bundleRoot "Focule-Setup-$Version.exe"
 
@@ -72,7 +73,9 @@ $readme = @"
 
 1. Run ``Focule-Setup-$Version.exe``.
 2. Install and start Ollama.
-3. Download every ``qwen3.5-4b.gguf.part*`` file into this folder.
+3. Download ``Focule-$Version-Release-Tools.zip``, ``SHA256SUMS.txt``, and every
+   ``qwen3.5-4b.gguf.part*`` file into one folder. Extract the tools ZIP into that
+   folder.
 4. Run ``powershell -ExecutionPolicy Bypass -File .\Join-QwenModelParts.ps1``.
    The script checks every part and the assembled model before saving it to
    ``runtime\ollama\qwen3.5-4b.gguf``.
@@ -80,18 +83,31 @@ $readme = @"
 6. Run ``Setup-Whisper.ps1`` if Python and Whisper are not installed, then launch
    Focule.
 
-The split model parts are each below GitHub's 2 GB asset limit. Review
-``SHA256SUMS.txt`` and ``licenses\THIRD-PARTY-NOTICES.md`` before installation.
+The split model parts are each below GitHub's 2 GB asset limit. Verify the
+downloaded assets against ``SHA256SUMS.txt`` and review
+``licenses\THIRD-PARTY-NOTICES.md`` before installation.
 Inference uses only Ollama at ``127.0.0.1:11434``; no cloud AI service is used.
 "@
 $readme | Set-Content -LiteralPath (Join-Path $assetsRoot 'README.md') -Encoding utf8
 
-$hashLines = Get-ChildItem -LiteralPath $assetsRoot -File -Recurse |
-    Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |
-    Sort-Object FullName |
+$supportPaths = @(
+    (Join-Path $assetsRoot 'README.md'),
+    (Join-Path $assetsRoot 'Install-QwenModel.ps1'),
+    (Join-Path $assetsRoot 'Join-QwenModelParts.ps1'),
+    (Join-Path $assetsRoot 'Setup-Whisper.ps1'),
+    (Join-Path $assetsRoot 'Focule-LICENSE.txt'),
+    (Join-Path $assetsRoot 'qwen3.5-4b.gguf.sha256'),
+    (Join-Path $assetsRoot 'licenses')
+)
+Compress-Archive -LiteralPath $supportPaths -DestinationPath $supportArchive -CompressionLevel Optimal -Force
+
+$releaseAssets = @(
+    (Join-Path $assetsRoot "Focule-Setup-$Version.exe"),
+    $supportArchive
+) + $partPaths
+$hashLines = $releaseAssets |
     ForEach-Object {
-        $relativePath = $_.FullName.Substring($assetsRoot.Length).TrimStart('\', '/')
-        "$(Get-Sha256Hex $_.FullName)  $relativePath"
+        "$(Get-Sha256Hex $_)  $(Split-Path -Leaf $_)"
     }
 $hashLines | Set-Content -LiteralPath (Join-Path $assetsRoot 'SHA256SUMS.txt') -Encoding ascii
 
